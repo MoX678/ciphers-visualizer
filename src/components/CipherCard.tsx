@@ -6,7 +6,7 @@ interface CipherCardProps {
   description: string;
   icon: React.ReactNode;
   href: string;
-  difficulty: "Easy" | "Medium" | "Advanced";
+  difficulty?: "Easy" | "Medium" | "Advanced";
   delay?: number;
 }
 
@@ -34,9 +34,11 @@ export function CipherCard({ title, description, icon, href, difficulty, delay =
           <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary/20 transition-colors">
             {icon}
           </div>
-          <span className={cn("text-xs font-medium", difficultyColors[difficulty])}>
-            {difficulty}
-          </span>
+          {difficulty && (
+            <span className={cn("text-xs font-medium", difficultyColors[difficulty])}>
+              {difficulty}
+            </span>
+          )}
         </div>
         
         <h3 className="text-lg font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">

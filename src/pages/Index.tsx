@@ -7,7 +7,9 @@ import {
   Rows3, 
   Lock, 
   Shield,
-  Layers
+  Layers,
+  FileKey,
+  SquareAsterisk
 } from "lucide-react";
 import LetterGlitch from '../components/LetterGlitch';
 
@@ -37,6 +39,12 @@ const ciphers = [
     href: "/hill",
   },
   {
+    title: "Playfair Cipher",
+    description: "Digraph substitution cipher using a 5×5 key matrix.",
+    icon: <SquareAsterisk className="w-6 h-6" />,
+    href: "/playfair",
+  },
+  {
     title: "Row Transposition",
     description: "Rearranges plaintext characters based on a keyword permutation pattern.",
     icon: <Rows3 className="w-6 h-6" />,
@@ -47,6 +55,12 @@ const ciphers = [
     description: "Uses multiple substitution alphabets to encrypt the message.",
     icon: <Layers className="w-6 h-6" />,
     href: "/polyalphabetic",
+  },
+  {
+    title: "One-Time Pad",
+    description: "Theoretically unbreakable cipher using random keys of equal message length.",
+    icon: <FileKey className="w-6 h-6" />,
+    href: "/otp",
   },
   {
     title: "DES Encryption",
@@ -107,14 +121,7 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-border/50 py-8 relative z-10">
-        <div className="container mx-auto px-4 text-center">
-          <p className="text-sm text-muted-foreground">
-            Learn cryptography through visualization
-          </p>
-        </div>
-      </footer>
+
     </div>
   );
 };

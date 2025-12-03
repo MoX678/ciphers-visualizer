@@ -11,6 +11,8 @@ import HillCipher from "./pages/HillCipher";
 import MonoalphabeticCipher from "./pages/MonoalphabeticCipher";
 import PolyalphabeticCipher from "./pages/PolyalphabeticCipher";
 import AESCipher from "./pages/AESCipher";
+import OneTimePadCipher from "./pages/OneTimePadCipher";
+import PlayfairCipher from "./pages/PlayfairCipher";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +32,8 @@ const App = () => (
           <Route path="/monoalphabetic" element={<MonoalphabeticCipher />} />
           <Route path="/polyalphabetic" element={<PolyalphabeticCipher />} />
           <Route path="/aes" element={<AESCipher />} />
+          <Route path="/otp" element={<OneTimePadCipher />} />
+          <Route path="/playfair" element={<PlayfairCipher />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
