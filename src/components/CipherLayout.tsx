@@ -13,7 +13,7 @@ export function CipherLayout({ title, description, children }: CipherLayoutProps
     <div className="min-h-screen bg-background grid-bg">
       {/* Header */}
       <header className="border-b border-border/50 bg-background/80 backdrop-blur-xl sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="px-4 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link to="/">
               <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary">
@@ -35,7 +35,7 @@ export function CipherLayout({ title, description, children }: CipherLayoutProps
       </header>
 
       {/* Main content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="px-4 lg:px-8 py-6">
         {children}
       </main>
     </div>

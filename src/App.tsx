@@ -13,6 +13,7 @@ import PolyalphabeticCipher from "./pages/PolyalphabeticCipher";
 import AESCipher from "./pages/AESCipher";
 import OneTimePadCipher from "./pages/OneTimePadCipher";
 import PlayfairCipher from "./pages/PlayfairCipher";
+import DESCipher from "./pages/DESCipher";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
           <Route path="/aes" element={<AESCipher />} />
           <Route path="/otp" element={<OneTimePadCipher />} />
           <Route path="/playfair" element={<PlayfairCipher />} />
+          <Route path="/des" element={<DESCipher />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { CipherLayout } from "@/components/CipherLayout";
 import { ModeToggle } from "@/components/ModeToggle";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, RotateCcw, Eye, EyeOff, ChevronLeft, ChevronRight } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Play, Pause, RotateCcw, Eye, EyeOff, ChevronLeft, ChevronRight, Info } from "lucide-react";
 
 // AES S-box
 const SBOX: number[] = [
@@ -656,6 +657,7 @@ export default function AESCipher() {
   const [mode, setMode] = useState<"encrypt" | "decrypt">("encrypt");
   const [activeStep, setActiveStep] = useState(-1);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [hasAnimated, setHasAnimated] = useState(false);
   const [steps, setSteps] = useState<AESStep[]>([]);
   const [showKey, setShowKey] = useState(false);
 
@@ -670,15 +672,20 @@ export default function AESCipher() {
       const cipherState = encryptedSteps[encryptedSteps.length - 1].state;
       setSteps(aesDecryptWithSteps(cipherState, paddedKey));
     }
+    // Reset animation state when inputs change
+    setHasAnimated(false);
+    setActiveStep(-1);
   }, [paddedInput, paddedKey, mode]);
 
   const startAnimation = () => {
     setIsAnimating(true);
+    setHasAnimated(true);
     setActiveStep(0);
   };
 
   const resetAnimation = () => {
     setIsAnimating(false);
+    setHasAnimated(false);
     setActiveStep(-1);
   };
 
@@ -705,7 +712,7 @@ export default function AESCipher() {
     return () => clearTimeout(timer);
   }, [isAnimating, activeStep, steps.length]);
 
-  const currentStep = activeStep >= 0 ? steps[activeStep] : steps[steps.length - 1];
+  const currentStep = hasAnimated ? (activeStep >= 0 ? steps[activeStep] : steps[steps.length - 1]) : null;
   const displayStep = activeStep >= 0 ? activeStep : steps.length - 1;
 
   return (
@@ -713,15 +720,57 @@ export default function AESCipher() {
       title="AES Encryption"
       description="Advanced Encryption Standard - 128-bit block cipher"
     >
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* Mode Toggle */}
-        <div className="flex justify-center">
-          <ModeToggle mode={mode} onChange={setMode} />
-        </div>
+      <div className="w-full space-y-4">
+        {/* Top Row - 2 columns: Controls + Step Navigation */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          
+          {/* Left - Controls */}
+          <div className="glass-card p-5 space-y-4">
+            {/* Header with Mode Toggle and Info */}
+            <div className="flex items-center justify-between">
+              <ModeToggle mode={mode} onChange={setMode} />
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="text-xs">
+                    <Info className="w-3.5 h-3.5 mr-1" />
+                    How It Works
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>How AES Encryption Works</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="text-xs space-y-3">
+                      <div className="bg-muted/20 rounded-lg p-3">
+                        <h4 className="font-medium text-foreground mb-2">📊 AES Parameters</h4>
+                        <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                          <li>Block size: <span className="text-primary">128 bits</span> (16 bytes)</li>
+                          <li>Key size: <span className="text-primary">128 bits</span> (this demo)</li>
+                          <li>Rounds: <span className="text-primary">10</span></li>
+                        </ul>
+                      </div>
+                      <div className="bg-muted/20 rounded-lg p-3">
+                        <h4 className="font-medium text-foreground mb-2">🔄 Round Operations</h4>
+                        <div className="space-y-1 text-muted-foreground">
+                          <p><span className="text-orange-400">● SubBytes:</span> S-box substitution</p>
+                          <p><span className="text-blue-400">● ShiftRows:</span> Row rotation</p>
+                          <p><span className="text-purple-400">● MixColumns:</span> Column mixing (not in last round)</p>
+                          <p><span className="text-green-400">● AddRoundKey:</span> XOR with round key</p>
+                        </div>
+                      </div>
+                      <div className="bg-green-500/10 rounded-lg p-3 border border-green-500/30">
+                        <h4 className="font-medium text-green-400 mb-2">✅ Security</h4>
+                        <p className="text-muted-foreground">
+                          AES is the current standard for symmetric encryption, used worldwide for securing data.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
 
-        {/* Controls */}
-        <div className="glass-card p-6 space-y-6">
-          <div className="grid md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
                 {mode === "encrypt" ? "Plaintext (16 bytes)" : "Input Text"}
@@ -734,13 +783,11 @@ export default function AESCipher() {
                 placeholder="Enter 16 characters..."
                 maxLength={16}
               />
-              <p className="text-xs text-muted-foreground mt-1">
-                {inputText.length}/16 bytes
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">{inputText.length}/16 bytes</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                Key (128-bit / 16 bytes)
+                Key (128-bit)
               </label>
               <div className="relative">
                 <input
@@ -759,77 +806,165 @@ export default function AESCipher() {
                 </button>
               </div>
             </div>
-          </div>
 
-          <div className="flex gap-3">
-            <Button
-              onClick={isAnimating ? () => setIsAnimating(false) : startAnimation}
-              variant="neon"
-              className="flex-1"
-            >
-              {isAnimating ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
-              {isAnimating ? "Pause" : "Animate"}
-            </Button>
-            <Button onClick={resetAnimation} variant="outline">
-              <RotateCcw className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={isAnimating ? () => setIsAnimating(false) : startAnimation}
+                variant="neon"
+                className="flex-1"
+              >
+                {isAnimating ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
+                {isAnimating ? "Pause" : "Animate"}
+              </Button>
+              <Button onClick={resetAnimation} variant="outline" size="icon">
+                <RotateCcw className="w-4 h-4" />
+              </Button>
+            </div>
 
-        {/* Step Navigation */}
-        <div className="glass-card p-4">
-          <div className="flex items-center justify-between gap-4">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={goToPrevStep}
-              disabled={activeStep <= 0}
-            >
-              <ChevronLeft className="w-4 h-4 mr-1" /> Prev
-            </Button>
-            <div className="text-center flex-1">
-              <div className="text-lg font-semibold text-foreground">
-                {currentStep?.name || "Final State"}
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Step {displayStep + 1} of {steps.length} • Round {currentStep?.round || 0}
+            {/* Legend */}
+            <div className="pt-4 border-t border-border">
+              <div className="flex flex-wrap gap-3 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded bg-orange-400" />
+                  <span className="text-muted-foreground">SubBytes</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded bg-blue-400" />
+                  <span className="text-muted-foreground">ShiftRows</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded bg-purple-400" />
+                  <span className="text-muted-foreground">MixColumns</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded bg-green-400" />
+                  <span className="text-muted-foreground">AddRoundKey</span>
+                </div>
               </div>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={goToNextStep}
-              disabled={activeStep >= steps.length - 1}
-            >
-              Next <ChevronRight className="w-4 h-4 ml-1" />
-            </Button>
+
+            {/* Output */}
+            <div className={cn(
+              "rounded-lg p-3 border",
+              mode === "decrypt" 
+                ? "bg-green-500/10 border-green-500/30" 
+                : "bg-primary/10 border-primary/30"
+            )}>
+              <div className="flex items-center justify-between mb-1">
+                <div className="text-xs text-muted-foreground">
+                  {mode === "encrypt" ? "Ciphertext" : "Plaintext"}
+                </div>
+                {hasAnimated && !isAnimating && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      "h-6 text-xs px-2",
+                      mode === "encrypt"
+                        ? "border-green-500/50 text-green-500 hover:bg-green-500/10"
+                        : "border-primary/50 text-primary hover:bg-primary/10"
+                    )}
+                    onClick={() => {
+                      setMode(mode === "encrypt" ? "decrypt" : "encrypt");
+                      resetAnimation();
+                    }}
+                  >
+                    {mode === "encrypt" ? "→ Decrypt" : "→ Encrypt"}
+                  </Button>
+                )}
+              </div>
+              <div className={cn(
+                "font-mono text-sm break-all",
+                mode === "decrypt" ? "text-green-500" : "text-primary"
+              )}>
+                {hasAnimated && steps.length > 0 
+                  ? stateToHex(steps[steps.length - 1].state).flat().join("")
+                  : "Click Animate to see result"}
+              </div>
+            </div>
           </div>
-          
-          {/* Progress bar */}
-          <div className="mt-4 h-2 bg-muted rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-primary transition-all duration-300"
-              style={{ width: `${((displayStep + 1) / steps.length) * 100}%` }}
-            />
+
+          {/* Right - Step Navigation & State */}
+          <div className="glass-card p-5 space-y-4">
+            {hasAnimated ? (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={goToPrevStep}
+                    disabled={activeStep <= 0}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <div className="text-center flex-1">
+                    <div className="text-sm font-semibold text-foreground truncate">
+                      {currentStep?.name || "Final State"}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Step {displayStep + 1}/{steps.length} • Round {currentStep?.round || 0}
+                    </div>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={goToNextStep}
+                    disabled={activeStep >= steps.length - 1}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+                
+                {/* Progress bar */}
+                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-primary transition-all duration-300"
+                    style={{ width: `${((displayStep + 1) / steps.length) * 100}%` }}
+                  />
+                </div>
+
+                {/* Current State Matrix */}
+                {currentStep && (
+              <div className="flex justify-center">
+                <StateMatrix 
+                  state={currentStep.state} 
+                  label="Current State" 
+                  highlight
+                  colorClass={`border ${
+                    currentStep.operation === "subbytes" ? "bg-orange-500/10 text-orange-400 border-orange-500/50" :
+                    currentStep.operation === "shiftrows" ? "bg-blue-500/10 text-blue-400 border-blue-500/50" :
+                    currentStep.operation === "mixcolumns" ? "bg-purple-500/10 text-purple-400 border-purple-500/50" :
+                    currentStep.operation === "addroundkey" ? "bg-green-500/10 text-green-400 border-green-500/50" :
+                    "bg-primary/10 text-primary border-primary/50"
+                  }`}
+                />
+              </div>
+            )}
+
+            <p className="text-xs text-muted-foreground text-center">
+              {currentStep?.description}
+            </p>
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-full min-h-[200px] text-muted-foreground">
+                <p className="text-sm italic">Click Animate to see AES steps</p>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Main Visualization */}
+        {/* Main Visualization - Full Width */}
         {currentStep && (
-          <div className="glass-card p-6 space-y-6">
-            <p className="text-sm text-muted-foreground text-center">
-              {currentStep.description}
-            </p>
-
+          <div className="glass-card p-5 space-y-4">
             {/* Before and After States */}
-            <div className="flex items-center justify-center gap-8 flex-wrap">
+            <div className="flex items-center justify-center gap-6 flex-wrap">
               <StateMatrix 
                 state={currentStep.prevState} 
                 label="Before" 
                 colorClass="bg-muted/50 text-muted-foreground border-border"
               />
-              <div className="flex flex-col items-center gap-2">
-                <div className={`text-4xl ${
+              <div className="flex flex-col items-center gap-1">
+                <div className={`text-3xl ${
                   currentStep.operation === "subbytes" ? "text-orange-400" :
                   currentStep.operation === "shiftrows" ? "text-blue-400" :
                   currentStep.operation === "mixcolumns" ? "text-purple-400" :
@@ -838,7 +973,7 @@ export default function AESCipher() {
                 }`}>
                   →
                 </div>
-                <div className={`text-xs font-medium px-2 py-1 rounded ${
+                <div className={`text-xs font-medium px-2 py-0.5 rounded ${
                   currentStep.operation === "subbytes" ? "bg-orange-500/20 text-orange-400" :
                   currentStep.operation === "shiftrows" ? "bg-blue-500/20 text-blue-400" :
                   currentStep.operation === "mixcolumns" ? "bg-purple-500/20 text-purple-400" :
@@ -878,42 +1013,36 @@ export default function AESCipher() {
           </div>
         )}
 
-        {/* Round Overview */}
-        <div className="glass-card p-6">
-          <h3 className="text-lg font-semibold text-foreground mb-4">AES Round Structure</h3>
-          <div className="flex items-center justify-center gap-2 flex-wrap text-xs">
-            <div className="px-3 py-2 rounded bg-muted text-foreground">Input</div>
+        {/* Round Overview - Full Width */}
+        <div className="glass-card p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-3">AES Round Structure</h3>
+          <div className="flex items-center justify-center gap-1.5 flex-wrap text-xs">
+            <div className="px-2 py-1 rounded bg-muted text-foreground">Input</div>
             <span className="text-muted-foreground">→</span>
-            <div className="px-3 py-2 rounded bg-green-500/20 text-green-400">AddRoundKey</div>
+            <div className="px-2 py-1 rounded bg-green-500/20 text-green-400">AddRoundKey</div>
             <span className="text-muted-foreground">→</span>
-            <div className="border-2 border-dashed border-muted-foreground rounded p-2 flex items-center gap-2">
-              <span className="text-muted-foreground">×9 Rounds:</span>
-              <div className="px-2 py-1 rounded bg-orange-500/20 text-orange-400">SubBytes</div>
-              <span>→</span>
-              <div className="px-2 py-1 rounded bg-blue-500/20 text-blue-400">ShiftRows</div>
-              <span>→</span>
-              <div className="px-2 py-1 rounded bg-purple-500/20 text-purple-400">MixColumns</div>
-              <span>→</span>
-              <div className="px-2 py-1 rounded bg-green-500/20 text-green-400">AddRoundKey</div>
+            <div className="border border-dashed border-muted-foreground rounded px-2 py-1 flex items-center gap-1">
+              <span className="text-muted-foreground">×9:</span>
+              <span className="text-orange-400">Sub</span>
+              <span className="text-blue-400">Shift</span>
+              <span className="text-purple-400">Mix</span>
+              <span className="text-green-400">Add</span>
             </div>
             <span className="text-muted-foreground">→</span>
-            <div className="border border-primary rounded p-2 flex items-center gap-2">
-              <span className="text-primary">Final:</span>
-              <div className="px-2 py-1 rounded bg-orange-500/20 text-orange-400">SubBytes</div>
-              <span>→</span>
-              <div className="px-2 py-1 rounded bg-blue-500/20 text-blue-400">ShiftRows</div>
-              <span>→</span>
-              <div className="px-2 py-1 rounded bg-green-500/20 text-green-400">AddRoundKey</div>
+            <div className="border border-primary rounded px-2 py-1 flex items-center gap-1">
+              <span className="text-orange-400">Sub</span>
+              <span className="text-blue-400">Shift</span>
+              <span className="text-green-400">Add</span>
             </div>
             <span className="text-muted-foreground">→</span>
-            <div className="px-3 py-2 rounded bg-primary text-primary-foreground">Ciphertext</div>
+            <div className="px-2 py-1 rounded bg-primary text-primary-foreground">Cipher</div>
           </div>
         </div>
 
-        {/* Steps Timeline */}
-        <div className="glass-card p-6 space-y-4">
-          <h3 className="text-lg font-semibold text-foreground">All Steps</h3>
-          <div className="max-h-48 overflow-y-auto space-y-1">
+        {/* Steps Timeline - Full Width */}
+        <div className="glass-card p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-3">All Steps</h3>
+          <div className="max-h-40 overflow-y-auto space-y-1">
             {steps.map((step, idx) => (
               <button
                 key={idx}
@@ -921,7 +1050,7 @@ export default function AESCipher() {
                   setActiveStep(idx);
                   setIsAnimating(false);
                 }}
-                className={`w-full text-left px-3 py-2 rounded-lg transition-all flex items-center gap-3 ${
+                className={`w-full text-left px-2 py-1.5 rounded transition-all flex items-center gap-2 ${
                   idx === displayStep
                     ? "bg-primary/20 border border-primary"
                     : idx < displayStep
@@ -929,7 +1058,7 @@ export default function AESCipher() {
                     : "bg-transparent border border-transparent hover:bg-muted/20"
                 }`}
               >
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-mono shrink-0 ${
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-mono shrink-0 ${
                   idx === displayStep ? "bg-primary text-primary-foreground" :
                   idx < displayStep ? "bg-muted-foreground/50 text-background" :
                   "bg-muted text-muted-foreground"
@@ -943,31 +1072,9 @@ export default function AESCipher() {
                   step.operation === "addroundkey" ? "bg-green-400" :
                   "bg-gray-400"
                 }`} />
-                <span className="text-sm text-foreground truncate">{step.name}</span>
+                <span className="text-xs text-foreground truncate">{step.name}</span>
               </button>
             ))}
-          </div>
-        </div>
-
-        {/* Legend */}
-        <div className="glass-card p-4">
-          <div className="flex items-center justify-center gap-6 flex-wrap text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-orange-400" />
-              <span className="text-muted-foreground">SubBytes</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-blue-400" />
-              <span className="text-muted-foreground">ShiftRows</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-purple-400" />
-              <span className="text-muted-foreground">MixColumns</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-green-400" />
-              <span className="text-muted-foreground">AddRoundKey</span>
-            </div>
           </div>
         </div>
       </div>

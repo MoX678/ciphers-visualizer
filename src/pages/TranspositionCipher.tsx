@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import { CipherLayout } from "@/components/CipherLayout";
 import { ModeToggle } from "@/components/ModeToggle";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, RotateCcw, Info } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Play, Pause, RotateCcw, Info, ChevronRight, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Parse numeric key like "4312567" into column order
@@ -53,7 +54,9 @@ function transpose(text: string, key: string, decrypt: boolean): string {
       }
     }
     
-    return grid.map(row => row.join("")).join("");
+    // Remove trailing X padding
+    const result = grid.map(row => row.join("")).join("");
+    return result.replace(/X+$/, "");
   }
 }
 
@@ -63,8 +66,8 @@ export default function TranspositionCipher() {
   const [mode, setMode] = useState<"encrypt" | "decrypt">("encrypt");
   const [activeStep, setActiveStep] = useState(-1);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [hasAnimated, setHasAnimated] = useState(false);
   const [outputText, setOutputText] = useState("");
-  const [showTutorial, setShowTutorial] = useState(true);
   const [decryptGrid, setDecryptGrid] = useState<string[][]>([]);
 
   const cleanInput = inputText.toUpperCase().replace(/[^A-Z]/g, "");
@@ -88,6 +91,7 @@ export default function TranspositionCipher() {
   const startAnimation = () => {
     if (!isKeyValid) return;
     setIsAnimating(true);
+    setHasAnimated(true);
     setActiveStep(1);
     setOutputText("");
     // Initialize empty decrypt grid for decryption mode
@@ -98,9 +102,51 @@ export default function TranspositionCipher() {
 
   const resetAnimation = () => {
     setIsAnimating(false);
+    setHasAnimated(false);
     setActiveStep(-1);
-    setOutputText(transpose(inputText, key, mode === "decrypt"));
+    setOutputText("");
     setDecryptGrid([]);
+  };
+
+  // Step navigation functions
+  const goToStep = (step: number) => {
+    if (!isKeyValid || step < 1 || step > keyLen + 1) return;
+    setIsAnimating(false);
+    setHasAnimated(true);
+    setActiveStep(step);
+
+    if (mode === "encrypt") {
+      // Calculate output up to this step
+      let result = "";
+      for (let s = 1; s < step; s++) {
+        const colIndex = columnOrder.indexOf(s);
+        for (let r = 0; r < numRows; r++) {
+          result += grid[r]?.[colIndex] || "";
+        }
+      }
+      setOutputText(result);
+    } else {
+      // Build decrypt grid up to this step
+      const newGrid: string[][] = Array.from({ length: numRows }, () => Array(keyLen).fill(""));
+      let pos = 0;
+      for (let s = 1; s < step; s++) {
+        const colIndex = columnOrder.indexOf(s);
+        for (let r = 0; r < numRows; r++) {
+          newGrid[r][colIndex] = paddedText[pos++];
+        }
+      }
+      setDecryptGrid(newGrid);
+    }
+  };
+
+  const goToPrevStep = () => {
+    const targetStep = Math.max(1, activeStep - 1);
+    goToStep(targetStep);
+  };
+
+  const goToNextStep = () => {
+    const targetStep = Math.min(keyLen + 1, activeStep + 1);
+    goToStep(targetStep);
   };
 
   useEffect(() => {
@@ -142,17 +188,20 @@ export default function TranspositionCipher() {
     return () => clearTimeout(timer);
   }, [isAnimating, activeStep, columnOrder, grid, numRows, keyLen, mode, paddedText, decryptGrid]);
 
+  // Reset animation state when input changes
   useEffect(() => {
-    if (isKeyValid) {
-      setOutputText(transpose(inputText, key, mode === "decrypt"));
-      setDecryptGrid([]);
-    }
-  }, [inputText, key, mode, isKeyValid]);
+    setHasAnimated(false);
+    setActiveStep(-1);
+    setOutputText("");
+    setDecryptGrid([]);
+  }, [inputText, key, mode]);
 
   // Get column highlight status based on the key number
   const getColumnStatus = (colIndex: number) => {
-    if (!isAnimating) return "idle";
+    if (!hasAnimated) return "idle";
     const keyNumber = columnOrder[colIndex];
+    // Animation completed - all columns are done
+    if (!isAnimating && activeStep > keyLen) return "done";
     if (keyNumber === activeStep) return "active";
     if (keyNumber < activeStep) return "done";
     return "idle";
@@ -160,27 +209,31 @@ export default function TranspositionCipher() {
 
   // Get the current grid to display (for decrypt, use the progressively filled grid)
   const displayGrid = useMemo(() => {
-    if (mode === "decrypt" && isAnimating && decryptGrid.length > 0) {
+    if (mode === "decrypt" && hasAnimated && decryptGrid.length > 0) {
       return decryptGrid;
     }
     return grid;
-  }, [mode, isAnimating, decryptGrid, grid]);
+  }, [mode, hasAnimated, decryptGrid, grid]);
 
-  // Get cell status for decryption visualization
+  // Get cell status for visualization
   const getCellStatus = (rowIndex: number, colIndex: number) => {
-    if (!isAnimating) return "idle";
+    if (!hasAnimated) return "idle";
+    
+    const keyNumber = columnOrder[colIndex];
     
     if (mode === "decrypt") {
-      const keyNumber = columnOrder[colIndex];
+      // Animation completed - all cells are filled
+      if (!isAnimating && activeStep > keyLen) return "filled";
       if (keyNumber === activeStep) return "filling";
       if (keyNumber < activeStep) return "filled";
       return "empty";
     } else {
-      // Encryption mode
-      const keyNumber = columnOrder[colIndex];
-      if (keyNumber === activeStep) return "active";
-      if (keyNumber < activeStep) return "done";
-      return "idle";
+      // Encryption mode - reading columns
+      // Animation completed - all cells are read
+      if (!isAnimating && activeStep > keyLen) return "read";
+      if (keyNumber === activeStep) return "reading";
+      if (keyNumber < activeStep) return "read";
+      return "waiting"; // waiting to be read
     }
   };
 
@@ -189,18 +242,77 @@ export default function TranspositionCipher() {
       title="Row Transposition Cipher"
       description="Rearranges plaintext by writing in rows and reading columns by numeric key order"
     >
-      <div className="max-w-5xl mx-auto space-y-6">
-        {/* Mode Toggle */}
-        <div className="flex justify-center">
-          <ModeToggle mode={mode} onChange={setMode} />
-        </div>
+      <div className="w-full space-y-4">
+        {/* Top Row - 2 columns: Controls + Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          
+          {/* Left - Controls */}
+          <div className="glass-card p-5 space-y-4">
+            {/* Header with Mode Toggle and Info */}
+            <div className="flex items-center justify-between">
+              <ModeToggle mode={mode} onChange={setMode} />
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="text-xs">
+                    <Info className="w-3.5 h-3.5 mr-1" />
+                    How It Works
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>How Row Transposition Cipher Works</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                      {mode === "encrypt" ? (
+                        <>
+                          <div className="bg-muted/20 rounded-lg p-3">
+                            <h4 className="font-medium text-foreground mb-2">📝 Encryption Steps</h4>
+                            <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                              <li>Write <span className="text-secondary">numeric key</span> as column headers</li>
+                              <li>Write plaintext in rows (pad with X if needed)</li>
+                              <li>Read columns in order: 1, 2, 3...</li>
+                              <li>Concatenate to get ciphertext</li>
+                            </ol>
+                          </div>
+                          <div className="bg-primary/10 rounded-lg p-3 border border-primary/30">
+                            <h4 className="font-medium text-foreground mb-2">🔑 Example: Key "4312567"</h4>
+                            <div className="space-y-0.5 text-muted-foreground font-mono text-[10px]">
+                              <p>Key:   <span className="text-secondary">4 3 1 2 5 6 7</span></p>
+                              <p>Row 1: a t t a c k p</p>
+                              <p>Row 2: o s t p o n e</p>
+                              <p className="pt-1 text-foreground">Read: 1→ttno, 2→apta, 3→tsuw...</p>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="bg-muted/20 rounded-lg p-3 md:col-span-2">
+                          <h4 className="font-medium text-foreground mb-2">🔓 Decryption Steps</h4>
+                          <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                            <li>Set up grid with key columns</li>
+                            <li>Calculate chars per column (rows × 1)</li>
+                            <li>Fill column "1", then "2", then "3"...</li>
+                            <li>Read rows left-to-right for plaintext</li>
+                          </ol>
+                        </div>
+                      )}
+                      <div className="bg-yellow-500/10 rounded-lg p-3 border border-yellow-500/30 md:col-span-2">
+                        <h4 className="font-medium text-yellow-400 mb-1">⚠️ Key Format</h4>
+                        <p className="text-muted-foreground">
+                          Must contain digits 1-n without repeats: 
+                          <span className="text-green-400 font-mono ml-1">4312567</span> ✓ 
+                          <span className="text-red-400 font-mono ml-2">4589</span> ✗
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
 
-        {/* Controls */}
-        <div className="glass-card p-6 space-y-6">
-          <div className="grid md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                {mode === "encrypt" ? "Plaintext Message" : "Ciphertext Message"}
+                {mode === "encrypt" ? "Plaintext" : "Ciphertext"}
               </label>
               <input
                 type="text"
@@ -214,7 +326,7 @@ export default function TranspositionCipher() {
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                Numeric Key (e.g., 4312567)
+                Numeric Key
               </label>
               <input
                 type="text"
@@ -226,75 +338,138 @@ export default function TranspositionCipher() {
                     ? "border-secondary text-secondary focus:ring-secondary" 
                     : "border-red-500/50 text-red-400 focus:ring-red-500"
                 )}
-                placeholder="Enter numeric key..."
+                placeholder="e.g., 4312567"
               />
               <p className={cn("text-xs mt-1", isKeyValid ? "text-muted-foreground" : "text-red-400")}>
                 {isKeyValid 
-                  ? `${keyLen} columns • Key must contain digits 1-${keyLen} without repeats`
-                  : "Invalid: must be digits 1-n (e.g., 4312567 uses 1,2,3,4,5,6,7)"
+                  ? `${keyLen} columns • Digits 1-${keyLen}`
+                  : "Invalid: must be digits 1-n"
                 }
               </p>
             </div>
-          </div>
 
-          <div className="flex gap-3">
-            <Button
-              onClick={isAnimating ? () => setIsAnimating(false) : startAnimation}
-              variant="neon"
-              className="flex-1"
-              disabled={!isKeyValid}
-            >
-              {isAnimating ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
-              {isAnimating ? "Pause" : "Animate"}
-            </Button>
-            <Button onClick={resetAnimation} variant="outline" disabled={!isKeyValid}>
-              <RotateCcw className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Progress */}
-        {isAnimating && (
-          <div className="glass-card p-4">
-            <div className="flex justify-between text-sm text-muted-foreground mb-2">
-              <span>
-                {mode === "encrypt" 
-                  ? "Reading columns in order: 1, 2, 3, ..." 
-                  : "Filling columns in order: 1, 2, 3, ..."}
-              </span>
-              <span>Column {Math.min(activeStep, keyLen)} / {keyLen}</span>
+            <div className="flex gap-2">
+              <Button
+                onClick={isAnimating ? () => setIsAnimating(false) : startAnimation}
+                variant="neon"
+                className="flex-1"
+                disabled={!isKeyValid}
+              >
+                {isAnimating ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
+                {isAnimating ? "Pause" : "Animate"}
+              </Button>
+              <Button onClick={resetAnimation} variant="outline" size="icon" disabled={!isKeyValid}>
+                <RotateCcw className="w-4 h-4" />
+              </Button>
             </div>
-            <div className="h-2 bg-muted rounded-full overflow-hidden">
-              <div 
-                className={cn(
-                  "h-full transition-all duration-300",
-                  mode === "decrypt" ? "bg-green-500" : "bg-primary"
-                )}
-                style={{ width: `${((activeStep - 1) / keyLen) * 100}%` }}
-              />
-            </div>
-          </div>
-        )}
 
-        {/* Grid Visualization */}
-        {isKeyValid && (
-          <div className="glass-card p-6 space-y-6">
-            <h3 className="text-lg font-semibold text-foreground">
-              {mode === "encrypt" ? "Transposition Grid" : "Decryption Grid"}
-              {mode === "decrypt" && isAnimating && (
-                <span className="text-sm font-normal text-muted-foreground ml-2">
-                  (Filling columns in order 1, 2, 3...)
-                </span>
-              )}
-            </h3>
+            {/* Progress bar */}
+            {hasAnimated && (
+              <div className="pt-4 border-t border-border">
+                <div className="flex justify-between text-xs text-muted-foreground mb-2">
+                  <span>{mode === "encrypt" ? "Reading columns" : "Filling columns"}</span>
+                  <span>{Math.min(activeStep > keyLen ? keyLen : activeStep - 1, keyLen)} / {keyLen}</span>
+                </div>
+                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className={cn("h-full transition-all duration-300", mode === "decrypt" ? "bg-green-500" : "bg-primary")}
+                    style={{ width: `${(Math.min(activeStep > keyLen ? keyLen : activeStep - 1, keyLen) / keyLen) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
 
-            {/* Ciphertext breakdown for decryption */}
-            {mode === "decrypt" && (
-              <div className="bg-muted/20 rounded-lg p-4 mb-4">
-                <p className="text-sm text-muted-foreground mb-3">
-                  Ciphertext split into {keyLen} groups of {numRows} characters each:
-                </p>
-                <div className="flex flex-wrap gap-2">
+            {/* Output - shows live during animation */}
+            {isKeyValid && (
+              <div className={cn(
+                "pt-4 border-t border-border rounded-lg p-3",
+                mode === "decrypt" ? "bg-green-500/10 border-green-500/30" : "bg-primary/10 border-primary/30"
+              )}>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-xs text-muted-foreground">
+                    {mode === "encrypt" ? "Ciphertext" : "Plaintext"}
+                  </div>
+                  {hasAnimated && !isAnimating && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "h-7 px-3 text-xs font-medium transition-colors",
+                        mode === "encrypt" 
+                          ? "border-green-500/50 text-green-400 hover:bg-green-500/10 hover:text-green-300"
+                          : "border-primary/50 text-primary hover:bg-primary/10 hover:text-primary"
+                      )}
+                      onClick={() => {
+                        const result = transpose(inputText, key, mode === "decrypt");
+                        setInputText(result);
+                        setMode(mode === "encrypt" ? "decrypt" : "encrypt");
+                        resetAnimation();
+                      }}
+                    >
+                      {mode === "encrypt" ? "→ Decrypt" : "→ Encrypt"}
+                    </Button>
+                  )}
+                </div>
+                <div className={cn(
+                  "font-mono text-lg break-all min-h-[1.75rem]",
+                  mode === "decrypt" ? "text-green-400" : "text-primary"
+                )}>
+                  {hasAnimated 
+                    ? (isAnimating 
+                        ? (mode === "decrypt" ? decryptGrid.map(row => row.join("")).join("") : outputText)
+                        : transpose(inputText, key, mode === "decrypt"))
+                    : <span className="text-muted-foreground text-sm italic">Click Animate to see result</span>
+                  }
+                </div>
+              </div>
+            )}
+
+            {/* Plaintext rows for encryption */}
+            {mode === "encrypt" && isKeyValid && (
+              <div className="pt-4 border-t border-border">
+                <div className="text-sm text-muted-foreground mb-2">
+                  Plaintext Rows ({numRows} × {keyLen})
+                </div>
+                <div className="space-y-1.5">
+                  {grid.map((row, rowIndex) => (
+                    <div key={rowIndex} className="flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground w-8">R{rowIndex + 1}:</span>
+                      <div className="flex gap-0.5">
+                        {row.map((char, colIndex) => {
+                          const keyNum = columnOrder[colIndex];
+                          const status = getColumnStatus(colIndex);
+                          return (
+                            <span
+                              key={colIndex}
+                              onClick={() => !isAnimating && goToStep(keyNum)}
+                              className={cn(
+                                "w-8 h-8 flex items-center justify-center rounded font-mono text-sm border transition-all",
+                                !isAnimating && "cursor-pointer hover:bg-muted/50",
+                                status === "active" && "bg-primary/20 border-primary text-primary animate-pulse",
+                                status === "done" && "bg-primary/10 border-primary/50 text-foreground",
+                                status === "idle" && "bg-muted/20 border-border text-muted-foreground/50"
+                              )}
+                            >
+                              {char}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <span className="text-muted-foreground mx-1">→</span>
+                      <span className="font-mono text-foreground">{row.join("")}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Ciphertext groups for decryption */}
+            {mode === "decrypt" && isKeyValid && (
+              <div className="pt-4 border-t border-border">
+                <div className="text-xs text-muted-foreground mb-2">
+                  Ciphertext Groups ({keyLen} × {numRows} chars)
+                </div>
+                <div className="flex flex-wrap gap-1">
                   {Array.from({ length: keyLen }, (_, i) => {
                     const startPos = i * numRows;
                     const chunk = paddedText.slice(startPos, startPos + numRows);
@@ -302,385 +477,298 @@ export default function TranspositionCipher() {
                     const status = getColumnStatus(colIndex);
                     return (
                       <div 
-                        key={i} 
+                        key={i}
+                        onClick={() => !isAnimating && goToStep(i + 1)}
                         className={cn(
-                          "rounded px-3 py-2 transition-all duration-300",
-                          status === "active" && "bg-green-500/20 border border-green-500 shadow-[0_0_10px_hsl(142,76%,36%,0.5)]",
+                          "rounded px-1.5 py-0.5 transition-all text-xs",
+                          !isAnimating && "cursor-pointer hover:bg-muted/50",
+                          status === "active" && "bg-green-500/20 border border-green-500",
                           status === "done" && "bg-muted/50 border border-muted-foreground/30",
                           status === "idle" && "bg-muted/30 border border-border"
                         )}
                       >
-                        <div className="text-xs text-secondary mb-1">
-                          → Col "{i + 1}" (pos {colIndex + 1})
-                        </div>
-                        <div className={cn(
-                          "font-mono text-lg tracking-widest",
+                        <span className="text-secondary text-[10px]">{i + 1}: </span>
+                        <span className={cn(
+                          "font-mono",
                           status === "active" && "text-green-400",
                           status === "done" && "text-muted-foreground",
                           status === "idle" && "text-foreground"
                         )}>
                           {chunk}
-                        </div>
+                        </span>
                       </div>
                     );
                   })}
                 </div>
               </div>
             )}
+          </div>
 
-            <div className="overflow-x-auto">
-              <table className="mx-auto border-collapse">
-                {/* Key row - the numeric key */}
-                <thead>
-                  <tr>
-                    <th className="w-12 h-10 border border-transparent text-sm text-muted-foreground font-normal">
-                      Key:
-                    </th>
-                    {columnOrder.map((num, i) => (
-                      <th
-                        key={`key-${i}`}
-                        className={cn(
-                          "w-12 h-12 border border-border font-mono text-xl font-bold transition-all duration-300",
-                          getColumnStatus(i) === "active" && (mode === "decrypt" 
-                            ? "bg-green-500/30 border-green-500 text-green-400 shadow-[0_0_15px_hsl(142,76%,36%,0.5)]"
-                            : "bg-secondary/30 border-secondary text-secondary shadow-[0_0_15px_hsl(var(--secondary)/0.5)]"),
-                          getColumnStatus(i) === "done" && (mode === "decrypt"
-                            ? "bg-green-500/10 border-green-500/50 text-green-400/70"
-                            : "bg-secondary/10 border-secondary/50 text-secondary/70")
-                        )}
+          {/* Right - Grid Visualization & Steps */}
+          <div className="glass-card p-5 space-y-4">
+            {isKeyValid ? (
+              <>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {mode === "encrypt" ? "Transposition Grid" : "Decryption Grid"}
+                  </h3>
+                  {hasAnimated && (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={goToPrevStep}
+                        disabled={activeStep <= 1 || isAnimating}
+                        className="h-6 w-6 p-0"
                       >
-                        {num}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {displayGrid.map((row, rowIndex) => (
-                    <tr key={`row-${rowIndex}`}>
-                      <td className="w-12 h-10 border border-transparent text-xs text-muted-foreground text-right pr-2">
-                        Row {rowIndex + 1}
-                      </td>
-                      {row.map((cell, colIndex) => {
-                        const cellStatus = getCellStatus(rowIndex, colIndex);
-                        return (
-                          <td
-                            key={`cell-${rowIndex}-${colIndex}`}
-                            className={cn(
-                              "w-12 h-12 border border-border font-mono text-lg text-center transition-all duration-300",
-                              mode === "decrypt" && cellStatus === "filling" && "bg-green-500/20 border-green-500 text-green-400 animate-pulse",
-                              mode === "decrypt" && cellStatus === "filled" && "bg-green-500/10 border-green-500/50 text-foreground",
-                              mode === "decrypt" && cellStatus === "empty" && "bg-muted/20 text-muted-foreground/30",
-                              mode === "encrypt" && cellStatus === "active" && "bg-primary/20 border-primary text-primary animate-pulse",
-                              mode === "encrypt" && cellStatus === "done" && "bg-muted/50 text-muted-foreground"
-                            )}
-                          >
-                            {mode === "decrypt" && isAnimating ? (cell || "·") : cell}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                      <span className="text-xs text-muted-foreground px-1">
+                        {activeStep > keyLen ? "Done" : `Step ${activeStep}`}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={goToNextStep}
+                        disabled={activeStep > keyLen || isAnimating}
+                        className="h-6 w-6 p-0"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
 
-            {/* Reading/Filling order explanation */}
-            <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
-              <span className="text-muted-foreground">
-                {mode === "encrypt" ? "Read columns in order:" : "Fill columns in order:"}
-              </span>
-              {Array.from({ length: keyLen }, (_, i) => i + 1).map((readOrder) => {
-                const colIndex = columnOrder.indexOf(readOrder);
-                const status = getColumnStatus(colIndex);
-                return (
-                  <span
-                    key={readOrder}
-                    className={cn(
-                      "font-mono px-3 py-1 rounded border transition-all duration-300",
-                      status === "active" && (mode === "decrypt"
-                        ? "bg-green-500/20 border-green-500 text-green-400 shadow-[0_0_10px_hsl(142,76%,36%,0.5)]"
-                        : "bg-primary/20 border-primary text-primary shadow-[0_0_10px_hsl(var(--primary)/0.5)]"),
-                      status === "done" && "bg-muted border-muted-foreground/30 text-muted-foreground",
-                      status === "idle" && "border-border text-foreground"
-                    )}
-                  >
-                    {readOrder}
-                  </span>
-                );
-              })}
-            </div>
+                {/* Encryption Grid - shows table with key row */}
+                {mode === "encrypt" && (
+                  <div className="overflow-x-auto">
+                    <table className="mx-auto border-collapse">
+                      <thead>
+                        <tr>
+                          <th className="w-8 h-8 border border-transparent text-xs text-muted-foreground font-normal"></th>
+                          {columnOrder.map((num, i) => (
+                            <th
+                              key={`key-${i}`}
+                              onClick={() => !isAnimating && goToStep(num)}
+                              className={cn(
+                                "w-9 h-9 border border-border font-mono text-base font-bold transition-all",
+                                !isAnimating && "cursor-pointer hover:bg-muted/50",
+                                getColumnStatus(i) === "active" && "bg-secondary/30 border-secondary text-secondary",
+                                getColumnStatus(i) === "done" && "bg-secondary/10 border-secondary/50 text-secondary/70"
+                              )}
+                            >
+                              {num}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {displayGrid.map((row, rowIndex) => (
+                          <tr key={`row-${rowIndex}`}>
+                            <td className="w-8 h-8 border border-transparent text-xs text-muted-foreground text-right pr-1">
+                              {rowIndex + 1}
+                            </td>
+                            {row.map((cell, colIndex) => {
+                              const cellStatus = getCellStatus(rowIndex, colIndex);
+                              return (
+                                <td
+                                  key={`cell-${rowIndex}-${colIndex}`}
+                                  onClick={() => !isAnimating && goToStep(columnOrder[colIndex])}
+                                  className={cn(
+                                    "w-9 h-9 border border-border font-mono text-base text-center transition-all",
+                                    !isAnimating && "cursor-pointer hover:bg-muted/50",
+                                    cellStatus === "reading" && "bg-primary/20 border-primary text-primary animate-pulse",
+                                    cellStatus === "read" && "bg-primary/10 border-primary/50 text-foreground",
+                                    cellStatus === "waiting" && "bg-muted/20 text-muted-foreground/50"
+                                  )}
+                                >
+                                  {cell}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
-            {/* Decryption: Show row reading after grid is filled */}
-            {mode === "decrypt" && !isAnimating && (
-              <div className="mt-4 pt-4 border-t border-border">
-                <p className="text-sm text-muted-foreground mb-3">
-                  Read rows left to right to get plaintext:
-                </p>
-                <div className="space-y-2">
-                  {grid.map((row, rowIndex) => {
-                    // For decrypt display, we need the decrypted grid
-                    const decryptedGrid = (() => {
-                      const g: string[][] = Array.from({ length: numRows }, () => Array(keyLen).fill(""));
-                      let pos = 0;
-                      for (let readOrder = 1; readOrder <= keyLen; readOrder++) {
-                        const colIdx = columnOrder.indexOf(readOrder);
-                        for (let r = 0; r < numRows; r++) {
-                          g[r][colIdx] = paddedText[pos++];
-                        }
-                      }
-                      return g;
-                    })();
+                {/* Decryption Grid - Read rows left to right */}
+                {mode === "decrypt" && (
+                  <div className="space-y-3">
+                    <div className="text-sm text-muted-foreground mb-2">
+                      Read rows left to right:
+                    </div>
+                    <div className="space-y-1.5">
+                      {decryptGrid.map((row, rowIndex) => (
+                        <div key={rowIndex} className="flex items-center gap-2 text-sm">
+                          <span className="text-muted-foreground w-12">Row {rowIndex + 1}:</span>
+                          <div className="flex gap-0.5">
+                            {row.map((char, colIndex) => {
+                              const keyNum = columnOrder[colIndex];
+                              // Cell is filled when: animation is done OR we're past this column's step
+                              const filled = hasAnimated && (!isAnimating || activeStep > keyNum);
+                              const filling = hasAnimated && isAnimating && activeStep === keyNum;
+                              return (
+                                <span
+                                  key={colIndex}
+                                  onClick={() => !isAnimating && goToStep(keyNum)}
+                                  className={cn(
+                                    "w-9 h-9 flex items-center justify-center rounded font-mono text-base border transition-all",
+                                    !isAnimating && "cursor-pointer hover:bg-muted/50",
+                                    filling && "bg-green-500/20 border-green-500 text-green-400 animate-pulse",
+                                    filled && !filling && "bg-green-500/10 border-green-500/50 text-foreground",
+                                    !filled && !filling && "bg-muted/20 border-border text-muted-foreground/30"
+                                  )}
+                                >
+                                  {(filled || filling) ? char : ""}
+                                </span>
+                              );
+                            })}
+                          </div>
+                          <span className="text-muted-foreground mx-1">→</span>
+                          <span className="font-mono text-green-400">
+                            {hasAnimated && !isAnimating ? row.join("") : ""}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Column order indicator - clickable */}
+                <div className="mt-4 pt-3 border-t border-border">
+                  <div className="flex flex-wrap items-center justify-center gap-1 text-xs">
+                    <span className="text-muted-foreground mr-1">
+                      {mode === "encrypt" ? "Read:" : "Fill:"}
+                    </span>
+                    {Array.from({ length: keyLen }, (_, i) => i + 1).map((readOrder) => {
+                      const colIndex = columnOrder.indexOf(readOrder);
+                      const status = getColumnStatus(colIndex);
+                      return (
+                        <span
+                          key={readOrder}
+                          onClick={() => !isAnimating && goToStep(readOrder)}
+                          className={cn(
+                            "font-mono px-2 py-0.5 rounded border transition-all",
+                            !isAnimating && "cursor-pointer hover:bg-muted/50",
+                            status === "active" && (mode === "decrypt"
+                              ? "bg-green-500/20 border-green-500 text-green-400"
+                              : "bg-primary/20 border-primary text-primary"),
+                            status === "done" && "bg-muted border-muted-foreground/30 text-muted-foreground",
+                            status === "idle" && "border-border text-foreground"
+                          )}
+                        >
+                          {readOrder}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Current Step Detail - merged here */}
+                {hasAnimated && activeStep >= 1 && activeStep <= keyLen && (
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <div className={cn(
+                      "text-sm font-medium mb-3 flex items-center gap-2",
+                      mode === "decrypt" ? "text-green-400" : "text-primary"
+                    )}>
+                      <span className={cn(
+                        "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
+                        mode === "decrypt" ? "bg-green-500/20 border border-green-500/50" : "bg-primary/20 border border-primary/50"
+                      )}>
+                        {activeStep}
+                      </span>
+                      <span>
+                        {mode === "encrypt" ? "Reading" : "Filling"} Column #{activeStep}
+                        <span className="text-muted-foreground font-normal ml-1">(Position {columnOrder.indexOf(activeStep) + 1})</span>
+                      </span>
+                    </div>
                     
-                    return (
-                      <div key={rowIndex} className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground w-16">Row {rowIndex + 1}:</span>
-                        <div className="flex gap-1">
-                          {decryptedGrid[rowIndex].map((char, colIndex) => (
+                    {mode === "encrypt" && (
+                      // Enhanced encryption visualization
+                      <div className="space-y-3">
+                        {/* Visual column reading */}
+                        <div className="flex items-center justify-center gap-4">
+                          <div className="text-center">
+                            <div className="text-xs text-muted-foreground mb-1">Column {columnOrder.indexOf(activeStep) + 1}</div>
+                            <div className="flex flex-col gap-0.5">
+                              {grid.map((row, rowIdx) => (
+                                <span
+                                  key={rowIdx}
+                                  className="w-8 h-8 flex items-center justify-center bg-primary/20 border border-primary rounded font-mono text-primary animate-pulse"
+                                >
+                                  {row[columnOrder.indexOf(activeStep)]}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="text-2xl text-muted-foreground">→</div>
+                          <div className="text-center">
+                            <div className="text-xs text-muted-foreground mb-1">Read Down</div>
+                            <div className="font-mono text-xl text-primary tracking-widest">
+                              {grid.map(row => row[columnOrder.indexOf(activeStep)]).join("")}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Output building */}
+                        <div className="pt-2 border-t border-border/50">
+                          <div className="text-xs text-muted-foreground mb-1">Ciphertext building:</div>
+                          <div className="font-mono text-sm">
+                            <span className="text-muted-foreground">{outputText}</span>
+                            <span className="text-primary animate-pulse">
+                              {grid.map(row => row[columnOrder.indexOf(activeStep)]).join("")}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {mode === "decrypt" && (
+                      // Show current characters being filled - vertical
+                      <div className="flex items-center justify-center gap-4">
+                        <div className="text-xs text-muted-foreground">Filling with:</div>
+                        <div className="flex flex-col gap-0.5">
+                          {paddedText.slice((activeStep - 1) * numRows, activeStep * numRows).split("").map((char, i) => (
                             <span
-                              key={colIndex}
-                              className="w-8 h-8 flex items-center justify-center bg-primary/10 border border-primary/30 rounded font-mono text-primary"
+                              key={i}
+                              className="w-8 h-8 flex items-center justify-center bg-green-500/20 border border-green-500 rounded font-mono text-green-400 animate-pulse"
                             >
                               {char}
                             </span>
                           ))}
                         </div>
-                        <span className="text-muted-foreground mx-2">→</span>
-                        <span className="font-mono text-primary">{decryptedGrid[rowIndex].join("")}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Current step explanation */}
-        {isAnimating && activeStep >= 1 && activeStep <= keyLen && (
-          <div className={cn(
-            "glass-card p-6",
-            mode === "decrypt" ? "border-green-500/50" : "border-primary/50"
-          )}>
-            <h3 className={cn(
-              "text-lg font-semibold mb-3",
-              mode === "decrypt" ? "text-green-400" : "text-primary"
-            )}>
-              Step {activeStep}: {mode === "encrypt" ? "Reading" : "Filling"} Column with Key Number {activeStep}
-            </h3>
-            <div className="space-y-3">
-              {mode === "encrypt" ? (
-                <>
-                  <p className="text-sm text-muted-foreground">
-                    Finding the column labeled "<span className="text-secondary font-mono font-bold">{activeStep}</span>" 
-                    in the key row, then reading all letters in that column from top to bottom.
-                  </p>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <span className="text-sm text-muted-foreground">Column position:</span>
-                    <span className="font-mono text-primary">{columnOrder.indexOf(activeStep) + 1}</span>
-                    <span className="text-sm text-muted-foreground">→ Letters:</span>
-                    <span className="font-mono text-primary tracking-widest">
-                      {grid.map(row => row[columnOrder.indexOf(activeStep)]).join("")}
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <p className="text-sm text-muted-foreground">
-                    Taking the next {numRows} characters from ciphertext and filling them into the column labeled "<span className="text-green-400 font-mono font-bold">{activeStep}</span>".
-                  </p>
-                  <div className="grid md:grid-cols-2 gap-4 mt-4">
-                    <div className="bg-muted/20 rounded-lg p-3">
-                      <div className="text-xs text-muted-foreground mb-2">Characters from ciphertext:</div>
-                      <div className="font-mono text-xl text-green-400 tracking-widest">
-                        {paddedText.slice((activeStep - 1) * numRows, activeStep * numRows)}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        (positions {(activeStep - 1) * numRows + 1} - {activeStep * numRows})
-                      </div>
-                    </div>
-                    <div className="bg-muted/20 rounded-lg p-3">
-                      <div className="text-xs text-muted-foreground mb-2">Filling into column:</div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">Key number</span>
-                        <span className="font-mono text-xl text-green-400">{activeStep}</span>
-                        <span className="text-sm text-muted-foreground">→ position</span>
-                        <span className="font-mono text-xl text-green-400">{columnOrder.indexOf(activeStep) + 1}</span>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Output */}
-        {isKeyValid && (
-          <div className="glass-card p-6 space-y-4">
-            <h3 className="text-lg font-semibold text-foreground">
-              {mode === "encrypt" ? "Ciphertext" : "Plaintext"} Output
-            </h3>
-            
-            {mode === "decrypt" && isAnimating ? (
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  After filling all columns, read rows left-to-right:
-                </p>
-                <div className="bg-muted/20 rounded-lg p-4">
-                  {decryptGrid.map((row, rowIndex) => (
-                    <div key={rowIndex} className="flex items-center gap-2 mb-2">
-                      <span className="text-xs text-muted-foreground w-12">Row {rowIndex + 1}:</span>
-                      <div className="flex gap-1">
-                        {row.map((char, colIndex) => (
-                          <span
-                            key={colIndex}
-                            className={cn(
-                              "w-7 h-7 flex items-center justify-center rounded font-mono text-sm transition-all",
-                              char ? "bg-green-500/20 border border-green-500/50 text-green-400" : "bg-muted/30 text-muted-foreground/30"
-                            )}
-                          >
-                            {char || "·"}
-                          </span>
-                        ))}
-                      </div>
-                      <span className="text-muted-foreground mx-1">→</span>
-                      <span className="font-mono text-green-400">{row.filter(c => c).join("")}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="font-mono text-2xl tracking-widest text-primary break-all pt-2 border-t border-border">
-                  {decryptGrid.map(row => row.join("")).join("")}
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="font-mono text-2xl tracking-widest text-primary break-all">
-                  {transpose(inputText, key, mode === "decrypt")}
-                </div>
-                
-                {/* Show grouped by columns for encryption */}
-                {mode === "encrypt" && (
-                  <div className="pt-4 border-t border-border">
-                    <p className="text-sm text-muted-foreground mb-2">Grouped by column reads:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {Array.from({ length: keyLen }, (_, readOrder) => {
-                        const colIndex = columnOrder.indexOf(readOrder + 1);
-                        const columnChars = grid.map(row => row[colIndex]).join("");
-                        return (
-                          <div key={readOrder} className="bg-muted/30 rounded px-2 py-1">
-                            <span className="text-xs text-secondary">Col {readOrder + 1}: </span>
-                            <span className="font-mono text-foreground">{columnChars}</span>
+                        <div className="text-2xl text-muted-foreground">→</div>
+                        <div className="text-center">
+                          <div className="text-xs text-muted-foreground mb-1">Column {columnOrder.indexOf(activeStep) + 1}</div>
+                          <div className="font-mono text-xl text-green-400 tracking-widest">
+                            {paddedText.slice((activeStep - 1) * numRows, activeStep * numRows)}
                           </div>
-                        );
-                      })}
-                    </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Done message */}
+                {hasAnimated && !isAnimating && activeStep > keyLen && (
+                  <div className="mt-4 pt-4 border-t border-border text-center">
+                    <span className="text-sm text-muted-foreground">
+                      ✓ {mode === "encrypt" ? "Encryption" : "Decryption"} complete!
+                    </span>
                   </div>
                 )}
               </>
+            ) : (
+              <div className="flex items-center justify-center h-full min-h-[200px] text-muted-foreground">
+                Enter a valid numeric key (e.g., 4312567)
+              </div>
             )}
           </div>
-        )}
-
-        {/* Result Summary */}
-        {isKeyValid && (
-          <div className="glass-card p-6">
-            <h3 className="text-lg font-semibold text-foreground mb-4">Summary</h3>
-            <div className="grid md:grid-cols-3 gap-4">
-              <div className="bg-muted/20 rounded-lg p-4">
-                <div className="text-sm text-muted-foreground mb-2">
-                  {mode === "encrypt" ? "Plaintext" : "Ciphertext"}
-                </div>
-                <div className="font-mono text-lg text-foreground break-all">
-                  {cleanInput}
-                </div>
-              </div>
-              <div className="bg-secondary/10 rounded-lg p-4 border border-secondary/30">
-                <div className="text-sm text-muted-foreground mb-2">Numeric Key</div>
-                <div className="font-mono text-lg text-secondary tracking-widest">
-                  {columnOrder.join("")}
-                </div>
-              </div>
-              <div className="bg-primary/10 rounded-lg p-4 border border-primary/30">
-                <div className="text-sm text-muted-foreground mb-2">
-                  {mode === "encrypt" ? "Ciphertext" : "Plaintext"}
-                </div>
-                <div className="font-mono text-lg text-primary break-all">
-                  {transpose(inputText, key, mode === "decrypt")}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Explanation */}
-        <div className="glass-card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-foreground">How It Works</h3>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowTutorial(!showTutorial)}
-            >
-              <Info className="w-4 h-4 mr-1" />
-              {showTutorial ? "Hide" : "Show"}
-            </Button>
-          </div>
-
-          {showTutorial && (
-            <div className="space-y-4 text-sm">
-              {mode === "encrypt" ? (
-                <>
-                  <div className="bg-muted/20 rounded-lg p-4">
-                    <h4 className="font-medium text-foreground mb-2">📝 Encryption Steps</h4>
-                    <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
-                      <li>Write the <span className="text-secondary">numeric key</span> across the top as column headers</li>
-                      <li>Write the plaintext in rows beneath the key (pad with X if needed)</li>
-                      <li>Read columns in numeric order: first column labeled "1", then "2", then "3", etc.</li>
-                      <li>Concatenate the column contents to get the ciphertext</li>
-                    </ol>
-                  </div>
-
-                  <div className="bg-primary/10 rounded-lg p-4 border border-primary/30">
-                    <h4 className="font-medium text-foreground mb-2">🔑 Example with Key "4312567"</h4>
-                    <div className="space-y-1 text-muted-foreground font-mono text-xs">
-                      <p>Key:       <span className="text-secondary">4 3 1 2 5 6 7</span></p>
-                      <p>Row 1:     a t t a c k p</p>
-                      <p>Row 2:     o s t p o n e</p>
-                      <p>Row 3:     d u n t i l l</p>
-                      <p>Row 4:     t w o a m x x</p>
-                      <p className="pt-2 text-foreground">
-                        Read order: Col "1" → ttno, Col "2" → apta, Col "3" → tsuw, ...
-                      </p>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="bg-muted/20 rounded-lg p-4">
-                  <h4 className="font-medium text-foreground mb-2">🔓 Decryption Steps</h4>
-                  <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
-                    <li>Set up the grid with the numeric key columns</li>
-                    <li>Calculate how many characters go in each column (rows × 1)</li>
-                    <li>Fill column "1" first, then "2", then "3", etc.</li>
-                    <li>Read the rows left-to-right to recover the plaintext</li>
-                  </ol>
-                </div>
-              )}
-
-              <div className="bg-yellow-500/10 rounded-lg p-4 border border-yellow-500/30">
-                <h4 className="font-medium text-yellow-400 mb-2">⚠️ Key Format</h4>
-                <p className="text-muted-foreground">
-                  The key must contain digits 1 through n without repeats. For example:
-                </p>
-                <ul className="list-disc list-inside mt-2 text-muted-foreground">
-                  <li><span className="text-green-400 font-mono">4312567</span> ✓ Valid (contains 1-7)</li>
-                  <li><span className="text-green-400 font-mono">312</span> ✓ Valid (contains 1-3)</li>
-                  <li><span className="text-red-400 font-mono">4312467</span> ✗ Invalid (missing 5, has two 4s)</li>
-                  <li><span className="text-red-400 font-mono">4589</span> ✗ Invalid (not sequential from 1)</li>
-                </ul>
-              </div>
-            </div>
-          )}
         </div>
+
+        {}
       </div>
     </CipherLayout>
   );

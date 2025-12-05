@@ -3,7 +3,9 @@ import { CipherLayout } from "@/components/CipherLayout";
 import { LetterBox } from "@/components/LetterBox";
 import { ModeToggle } from "@/components/ModeToggle";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, RotateCcw, Shuffle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Play, Pause, RotateCcw, Shuffle, Info, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -50,6 +52,7 @@ export default function MonoalphabeticCipher() {
   const [mode, setMode] = useState<"encrypt" | "decrypt">("encrypt");
   const [activeIndex, setActiveIndex] = useState(-1);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [hasAnimated, setHasAnimated] = useState(false);
   const [outputText, setOutputText] = useState("");
 
   const cleanInput = inputText.toUpperCase().replace(/[^A-Z]/g, "");
@@ -60,14 +63,16 @@ export default function MonoalphabeticCipher() {
   const startAnimation = () => {
     if (!isValidKey) return;
     setIsAnimating(true);
+    setHasAnimated(true);
     setActiveIndex(0);
     setOutputText("");
   };
 
   const resetAnimation = () => {
     setIsAnimating(false);
+    setHasAnimated(false);
     setActiveIndex(-1);
-    setOutputText(processText(inputText, key));
+    setOutputText("");
   };
 
   const shuffleKey = () => {
@@ -102,14 +107,17 @@ export default function MonoalphabeticCipher() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAnimating, activeIndex]);
 
+  // Reset animation state when inputs change
   useEffect(() => {
-    if (isValidKey) {
-      setOutputText(processText(inputText, key));
-    }
-  }, [inputText, key, mode, isValidKey, processText]);
+    setHasAnimated(false);
+    setActiveIndex(-1);
+    setOutputText("");
+  }, [inputText, key, mode]);
 
   const getCurrentMapping = () => {
-    if (activeIndex < 0 || activeIndex >= cleanInput.length || !isAnimating) return null;
+    if (activeIndex < 0 || activeIndex >= cleanInput.length) return null;
+    // Show mapping during animation or after animation completes (for persistence)
+    if (!isAnimating && !hasAnimated) return null;
     
     const inputChar = cleanInput[activeIndex];
     
@@ -139,79 +147,252 @@ export default function MonoalphabeticCipher() {
       title="Monoalphabetic Cipher"
       description="Simple substitution cipher with a fixed letter mapping"
     >
-      <div className="max-w-4xl mx-auto space-y-8">
-        {/* Mode Toggle */}
-        <div className="flex justify-center">
-          <ModeToggle mode={mode} onChange={setMode} />
-        </div>
+      <div className="w-full space-y-4">
+        {/* Top Row - 2 columns: Controls + Visualization */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          
+          {/* Left - Controls */}
+          <div className="glass-card p-5 space-y-4">
+            {/* Header with Mode Toggle and Info */}
+            <div className="flex items-center justify-between">
+              <ModeToggle mode={mode} onChange={setMode} />
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="text-xs">
+                    <Info className="w-3.5 h-3.5 mr-1" />
+                    How It Works
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>How Monoalphabetic Cipher Works</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                      <div className="bg-muted/20 rounded-lg p-3">
+                        <h4 className="font-medium text-foreground mb-2">
+                          {mode === "encrypt" ? "📝 Encryption" : "🔓 Decryption"}
+                        </h4>
+                        <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                          <li>Find letter's position in {mode === "encrypt" ? "standard alphabet" : "cipher key"}</li>
+                          <li>Look up letter at that position in {mode === "encrypt" ? "cipher key" : "standard alphabet"}</li>
+                          <li>Use that letter as the result</li>
+                        </ol>
+                        <p className="mt-2 text-foreground font-mono text-[10px]">
+                          Example: A → {key[0]}, B → {key[1]}, C → {key[2]}
+                        </p>
+                      </div>
+                      <div className="bg-yellow-500/10 rounded-lg p-3 border border-yellow-500/30">
+                        <h4 className="font-medium text-yellow-500 mb-2">⚠️ Security Note</h4>
+                        <p className="text-muted-foreground">
+                          While there are 26! (≈ 4×10²⁶) possible keys, monoalphabetic ciphers are easily broken 
+                          using <span className="text-foreground">frequency analysis</span> (E, T, A are most common in English).
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
 
-        {/* Controls */}
-        <div className="glass-card p-6 space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              {mode === "encrypt" ? "Plaintext Message" : "Ciphertext Message"}
-            </label>
-            <input
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 20))}
-              className="w-full bg-input border border-border rounded-lg px-4 py-3 font-mono text-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder={mode === "encrypt" ? "Enter message..." : "Enter ciphertext..."}
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-foreground">
-                Substitution Key (26 unique letters)
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                {mode === "encrypt" ? "Plaintext" : "Ciphertext"}
               </label>
-              <Button onClick={shuffleKey} variant="outline" size="sm" className="gap-2">
-                <Shuffle className="w-4 h-4" />
-                Randomize
+              <input
+                type="text"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 20))}
+                className="w-full bg-input border border-border rounded-lg px-4 py-3 font-mono text-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder={mode === "encrypt" ? "Enter message..." : "Enter ciphertext..."}
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-foreground">
+                  Substitution Key
+                </label>
+                <Button onClick={shuffleKey} variant="outline" size="sm" className="gap-1 h-7 text-xs">
+                  <Shuffle className="w-3 h-3" />
+                  Random
+                </Button>
+              </div>
+              <input
+                type="text"
+                value={key}
+                onChange={(e) => setKey(e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 26))}
+                className={cn(
+                  "w-full bg-input border rounded-lg px-4 py-3 font-mono text-sm text-secondary placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-secondary",
+                  isValidKey ? "border-border" : "border-red-500"
+                )}
+                placeholder="Enter 26 unique letters..."
+                maxLength={26}
+              />
+              {!isValidKey && key.length > 0 && (
+                <p className="text-xs text-red-500 mt-1">Need all 26 letters exactly once</p>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={isAnimating ? () => setIsAnimating(false) : startAnimation}
+                variant="neon"
+                className="flex-1"
+                disabled={!isValidKey}
+              >
+                {isAnimating ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
+                {isAnimating ? "Pause" : "Animate"}
+              </Button>
+              <Button onClick={resetAnimation} variant="outline" size="icon">
+                <RotateCcw className="w-4 h-4" />
               </Button>
             </div>
-            <input
-              type="text"
-              value={key}
-              onChange={(e) => setKey(e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 26))}
-              className={`w-full bg-input border rounded-lg px-4 py-3 font-mono text-lg text-secondary placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-secondary ${
-                isValidKey ? "border-border" : "border-red-500"
-              }`}
-              placeholder="Enter 26 unique letters..."
-              maxLength={26}
-            />
-            {!isValidKey && key.length > 0 && (
-              <p className="text-xs text-red-500 mt-1">
-                Key must contain all 26 letters exactly once
-              </p>
+
+            {/* Output - shows in controls */}
+            {isValidKey && (
+              <div className={cn(
+                "pt-4 border-t border-border rounded-lg p-3",
+                mode === "decrypt" ? "bg-green-500/10 border-green-500/30" : "bg-primary/10 border-primary/30"
+              )}>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-xs text-muted-foreground">
+                    {mode === "encrypt" ? "Ciphertext" : "Plaintext"}
+                  </div>
+                  {hasAnimated && !isAnimating && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "h-7 px-3 text-xs font-medium transition-colors",
+                        mode === "encrypt" 
+                          ? "border-green-500/50 text-green-400 hover:bg-green-500/10 hover:text-green-300"
+                          : "border-primary/50 text-primary hover:bg-primary/10 hover:text-primary"
+                      )}
+                      onClick={() => {
+                        const result = processText(inputText, key);
+                        setInputText(result);
+                        setMode(mode === "encrypt" ? "decrypt" : "encrypt");
+                        resetAnimation();
+                      }}
+                    >
+                      {mode === "encrypt" ? "→ Decrypt" : "→ Encrypt"}
+                    </Button>
+                  )}
+                </div>
+                <div className={cn(
+                  "font-mono text-lg break-all min-h-[1.75rem]",
+                  mode === "decrypt" ? "text-green-400" : "text-primary"
+                )}>
+                  {hasAnimated 
+                    ? (isAnimating ? outputText : processText(inputText, key))
+                    : <span className="text-muted-foreground text-sm italic">Click Animate to see result</span>
+                  }
+                </div>
+              </div>
+            )}
+
+            {/* Current mapping indicator */}
+            {currentMapping && isAnimating && (
+              <div className="pt-4 border-t border-border">
+                <div className="flex items-center justify-center gap-4 font-mono text-lg">
+                  <div className="flex flex-col items-center">
+                    <span className="text-[10px] text-muted-foreground">
+                      {mode === "encrypt" ? "Plain" : "Cipher"}
+                    </span>
+                    <span className="text-foreground bg-muted px-3 py-1.5 rounded">
+                      {currentMapping.from}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      idx: {currentMapping.fromIndex}
+                    </span>
+                  </div>
+                  <span className="text-primary text-2xl">→</span>
+                  <div className="flex flex-col items-center">
+                    <span className="text-[10px] text-muted-foreground">
+                      {mode === "encrypt" ? "Cipher" : "Plain"}
+                    </span>
+                    <span className="text-primary bg-primary/20 px-3 py-1.5 rounded">
+                      {currentMapping.to}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      idx: {currentMapping.toIndex}
+                    </span>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 
-          <div className="flex gap-3">
-            <Button
-              onClick={isAnimating ? () => setIsAnimating(false) : startAnimation}
-              variant="neon"
-              className="flex-1"
-              disabled={!isValidKey}
-            >
-              {isAnimating ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
-              {isAnimating ? "Pause" : "Animate"}
-            </Button>
-            <Button onClick={resetAnimation} variant="outline">
-              <RotateCcw className="w-4 h-4" />
-            </Button>
+          {/* Right - Step-by-Step Visualization */}
+          <div className="glass-card p-5 space-y-4">
+            <h3 className="text-sm font-semibold text-foreground">
+              {mode === "encrypt" ? "Encryption" : "Decryption"} Steps
+            </h3>
+            
+            {/* Input letters */}
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">
+                {mode === "encrypt" ? "Plaintext" : "Ciphertext"}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {cleanInput.split("").map((letter, i) => (
+                  <LetterBox
+                    key={`input-${i}`}
+                    letter={letter}
+                    variant="input"
+                    isActive={i === activeIndex}
+                    isHighlighted={i < activeIndex}
+                    showIndex
+                    index={mode === "encrypt" ? ALPHABET.indexOf(letter) : key.indexOf(letter)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Transformation indicator */}
+            <div className="flex items-center justify-center py-1">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="text-primary">↓</span>
+                <span>Substitution Table</span>
+                <span className="text-primary">↓</span>
+              </div>
+            </div>
+
+            {/* Output letters */}
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">
+                {mode === "encrypt" ? "Ciphertext" : "Plaintext"}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {hasAnimated ? (
+                  (isAnimating ? outputText : (isValidKey ? processText(inputText, key) : "")).split("").map((letter, i) => (
+                    <LetterBox
+                      key={`output-${i}`}
+                      letter={letter}
+                      variant="output"
+                      isHighlighted={i === activeIndex - 1}
+                      showIndex
+                      index={mode === "encrypt" ? key.indexOf(letter) : ALPHABET.indexOf(letter)}
+                    />
+                  ))
+                ) : (
+                  <span className="text-muted-foreground text-sm italic">Click Animate to see result</span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Alphabet Mapping Table */}
-        <div className="glass-card p-6 space-y-4">
-          <h3 className="text-lg font-semibold text-foreground">Substitution Table</h3>
+        {/* Substitution Table - Full Width */}
+        <div className="glass-card p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-3">Substitution Table</h3>
           
           <div className="overflow-x-auto">
             <div className="min-w-max">
               {/* Plain alphabet */}
-              <div className="flex gap-1 mb-1">
-                <div className="w-16 text-xs text-muted-foreground flex items-center">Plain:</div>
+              <div className="flex gap-0.5 mb-0.5">
+                <div className="w-12 text-xs text-muted-foreground flex items-center">Plain:</div>
                 {ALPHABET.split("").map((letter, i) => {
                   const isActive = currentMapping && 
                     ((mode === "encrypt" && letter === currentMapping.from) ||
@@ -219,11 +400,12 @@ export default function MonoalphabeticCipher() {
                   return (
                     <div
                       key={`plain-${i}`}
-                      className={`w-8 h-8 flex items-center justify-center font-mono text-sm rounded transition-all ${
+                      className={cn(
+                        "w-7 h-7 flex items-center justify-center font-mono text-xs rounded transition-all",
                         isActive 
                           ? "bg-primary text-primary-foreground ring-2 ring-primary" 
                           : "bg-muted text-foreground"
-                      }`}
+                      )}
                     >
                       {letter}
                     </div>
@@ -232,18 +414,18 @@ export default function MonoalphabeticCipher() {
               </div>
               
               {/* Arrow indicators */}
-              <div className="flex gap-1 mb-1">
-                <div className="w-16"></div>
+              <div className="flex gap-0.5 mb-0.5">
+                <div className="w-12"></div>
                 {ALPHABET.split("").map((_, i) => (
-                  <div key={`arrow-${i}`} className="w-8 h-4 flex items-center justify-center text-muted-foreground text-xs">
+                  <div key={`arrow-${i}`} className="w-7 h-3 flex items-center justify-center text-muted-foreground text-[10px]">
                     ↓
                   </div>
                 ))}
               </div>
               
               {/* Cipher alphabet */}
-              <div className="flex gap-1">
-                <div className="w-16 text-xs text-muted-foreground flex items-center">Cipher:</div>
+              <div className="flex gap-0.5">
+                <div className="w-12 text-xs text-muted-foreground flex items-center">Cipher:</div>
                 {key.split("").map((letter, i) => {
                   const isActive = currentMapping && 
                     ((mode === "encrypt" && letter === currentMapping.to) ||
@@ -251,11 +433,12 @@ export default function MonoalphabeticCipher() {
                   return (
                     <div
                       key={`cipher-${i}`}
-                      className={`w-8 h-8 flex items-center justify-center font-mono text-sm rounded transition-all ${
+                      className={cn(
+                        "w-7 h-7 flex items-center justify-center font-mono text-xs rounded transition-all",
                         isActive 
                           ? "bg-secondary text-secondary-foreground ring-2 ring-secondary" 
                           : "bg-secondary/20 text-secondary"
-                      }`}
+                      )}
                     >
                       {letter || "?"}
                     </div>
@@ -264,146 +447,6 @@ export default function MonoalphabeticCipher() {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Visualization */}
-        <div className="glass-card p-6 space-y-6">
-          <h3 className="text-lg font-semibold text-foreground">
-            Step-by-Step {mode === "encrypt" ? "Encryption" : "Decryption"}
-          </h3>
-          
-          {/* Input letters */}
-          <div>
-            <p className="text-sm text-muted-foreground mb-3">
-              {mode === "encrypt" ? "Plaintext" : "Ciphertext"}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {cleanInput.split("").map((letter, i) => (
-                <LetterBox
-                  key={`input-${i}`}
-                  letter={letter}
-                  variant="input"
-                  isActive={i === activeIndex}
-                  isHighlighted={i < activeIndex}
-                  showIndex
-                  index={mode === "encrypt" ? ALPHABET.indexOf(letter) : key.indexOf(letter)}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Transformation indicator */}
-          <div className="flex items-center justify-center py-4">
-            <div className="flex flex-col items-center gap-2 text-muted-foreground">
-              <span className={mode === "encrypt" ? "text-primary" : "text-secondary"}>↓</span>
-              <span className="font-mono text-sm text-center">
-                {mode === "encrypt" 
-                  ? "Look up each letter in substitution table" 
-                  : "Reverse look up in substitution table"}
-              </span>
-              <span className={mode === "encrypt" ? "text-primary" : "text-secondary"}>↓</span>
-            </div>
-          </div>
-
-          {/* Output letters */}
-          <div>
-            <p className="text-sm text-muted-foreground mb-3">
-              {mode === "encrypt" ? "Ciphertext" : "Plaintext"}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {(isAnimating ? outputText : (isValidKey ? processText(inputText, key) : "")).split("").map((letter, i) => (
-                <LetterBox
-                  key={`output-${i}`}
-                  letter={letter}
-                  variant="output"
-                  isHighlighted={i === activeIndex - 1}
-                  showIndex
-                  index={mode === "encrypt" ? key.indexOf(letter) : ALPHABET.indexOf(letter)}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Current mapping */}
-        {currentMapping && isAnimating && (
-          <div className="glass-card p-6 border-primary/50">
-            <h3 className="text-lg font-semibold text-primary mb-3">Current Substitution</h3>
-            <div className="flex items-center justify-center gap-4 font-mono text-2xl">
-              <div className="flex flex-col items-center">
-                <span className="text-xs text-muted-foreground mb-1">
-                  {mode === "encrypt" ? "Plain" : "Cipher"}
-                </span>
-                <span className="text-foreground bg-muted px-4 py-2 rounded-lg">
-                  {currentMapping.from}
-                </span>
-                <span className="text-xs text-muted-foreground mt-1">
-                  index: {currentMapping.fromIndex}
-                </span>
-              </div>
-              <span className="text-primary text-3xl">→</span>
-              <div className="flex flex-col items-center">
-                <span className="text-xs text-muted-foreground mb-1">
-                  {mode === "encrypt" ? "Cipher" : "Plain"}
-                </span>
-                <span className="text-primary bg-primary/20 px-4 py-2 rounded-lg">
-                  {currentMapping.to}
-                </span>
-                <span className="text-xs text-muted-foreground mt-1">
-                  index: {currentMapping.toIndex}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Explanation */}
-        <div className="glass-card p-6">
-          <h3 className="text-lg font-semibold text-foreground mb-3">How It Works</h3>
-          <div className="space-y-2 text-sm text-muted-foreground">
-            {mode === "encrypt" ? (
-              <>
-                <p>
-                  The monoalphabetic cipher replaces each letter with another letter according to a fixed substitution key.
-                </p>
-                <p>For each letter in the plaintext:</p>
-                <ol className="list-decimal list-inside space-y-1 font-mono text-foreground">
-                  <li>Find the letter's position in the standard alphabet (A=0, B=1, ...)</li>
-                  <li>Look up the letter at that position in the cipher key</li>
-                  <li>Use that letter as the ciphertext</li>
-                </ol>
-                <p className="mt-2">
-                  Example with current key: A → {key[0]}, B → {key[1]}, C → {key[2]}
-                </p>
-              </>
-            ) : (
-              <>
-                <p>
-                  To decrypt, we reverse the substitution by finding each ciphertext letter in the key.
-                </p>
-                <p>For each letter in the ciphertext:</p>
-                <ol className="list-decimal list-inside space-y-1 font-mono text-foreground">
-                  <li>Find the letter's position in the cipher key</li>
-                  <li>Look up the letter at that position in the standard alphabet</li>
-                  <li>Use that letter as the plaintext</li>
-                </ol>
-                <p className="mt-2">
-                  Example with current key: {key[0]} → A, {key[1]} → B, {key[2]} → C
-                </p>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Security Note */}
-        <div className="glass-card p-6 border-yellow-500/30">
-          <h3 className="text-lg font-semibold text-yellow-500 mb-3">Security Note</h3>
-          <p className="text-sm text-muted-foreground">
-            While there are 26! (≈ 4 × 10²⁶) possible keys, monoalphabetic ciphers are easily broken 
-            using <span className="text-foreground">frequency analysis</span>. In English, letters like 
-            E, T, A, O, I, N appear most frequently, making it possible to deduce the key by analyzing 
-            letter frequencies in the ciphertext.
-          </p>
         </div>
       </div>
     </CipherLayout>

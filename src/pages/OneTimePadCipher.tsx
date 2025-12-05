@@ -3,7 +3,9 @@ import { CipherLayout } from "@/components/CipherLayout";
 import { LetterBox } from "@/components/LetterBox";
 import { ModeToggle } from "@/components/ModeToggle";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, RotateCcw, Shuffle, Info, AlertTriangle, Shield } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Play, Pause, RotateCcw, Shuffle, Info, AlertTriangle, Shield, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -49,8 +51,8 @@ export default function OneTimePadCipher() {
   const [mode, setMode] = useState<"encrypt" | "decrypt">("encrypt");
   const [activeIndex, setActiveIndex] = useState(-1);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [hasAnimated, setHasAnimated] = useState(false);
   const [outputText, setOutputText] = useState("");
-  const [showTutorial, setShowTutorial] = useState(true);
 
   const cleanInput = inputText.toUpperCase().replace(/[^A-Z]/g, "");
   const cleanKey = key.toUpperCase().replace(/[^A-Z]/g, "");
@@ -74,14 +76,16 @@ export default function OneTimePadCipher() {
   const startAnimation = () => {
     if (!isKeyValid) return;
     setIsAnimating(true);
+    setHasAnimated(true);
     setActiveIndex(0);
     setOutputText("");
   };
 
   const resetAnimation = () => {
     setIsAnimating(false);
+    setHasAnimated(false);
     setActiveIndex(-1);
-    setOutputText(processText(inputText, key));
+    setOutputText("");
   };
 
   useEffect(() => {
@@ -110,15 +114,16 @@ export default function OneTimePadCipher() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAnimating, activeIndex]);
 
+  // Reset animation state when inputs change
   useEffect(() => {
-    if (isKeyValid) {
-      setOutputText(processText(inputText, key));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setHasAnimated(false);
+    setActiveIndex(-1);
+    setOutputText("");
   }, [inputText, key, mode]);
 
   const getCurrentCalculation = () => {
-    if (activeIndex < 0 || activeIndex >= cleanInput.length || !isAnimating) return null;
+    if (activeIndex < 0 || activeIndex >= cleanInput.length) return null;
+    if (!isAnimating && !hasAnimated) return null;
     
     const textChar = cleanInput[activeIndex];
     const keyChar = cleanKey[activeIndex];
@@ -158,13 +163,96 @@ export default function OneTimePadCipher() {
           </div>
         </div>
 
-        {/* Mode Toggle */}
-        <div className="flex justify-center">
-          <ModeToggle mode={mode} onChange={setMode} />
-        </div>
-
         {/* Input and Key */}
         <div className="glass-card p-6 space-y-4">
+          {/* Header with Mode Toggle and Info */}
+          <div className="flex items-center justify-between">
+            <ModeToggle mode={mode} onChange={setMode} />
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-xs">
+                  <Info className="w-3.5 h-3.5 mr-1" />
+                  How It Works
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>How One-Time Pad Works</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  {/* Perfect Secrecy */}
+                  <div className="bg-green-500/10 rounded-lg p-4 border border-green-500/30">
+                    <h4 className="text-sm font-medium text-green-400 mb-3 flex items-center gap-2">
+                      <Shield className="w-4 h-4" /> Perfect Secrecy
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      The One-Time Pad is the <strong className="text-foreground">only cipher mathematically proven to be unbreakable</strong> 
+                      when used correctly. This was proven by Claude Shannon in 1949.
+                    </p>
+                  </div>
+
+                  {/* Requirements */}
+                  <div className="bg-muted/20 rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-foreground mb-3">📋 Requirements for Perfect Security</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex items-start gap-2">
+                        <span className="w-5 h-5 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center text-xs shrink-0">1</span>
+                        <div>
+                          <p className="text-xs text-foreground">Key is truly random</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="w-5 h-5 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center text-xs shrink-0">2</span>
+                        <div>
+                          <p className="text-xs text-foreground">Key ≥ Message length</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="w-5 h-5 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center text-xs shrink-0">3</span>
+                        <div>
+                          <p className="text-xs text-foreground">Key used only once</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="w-5 h-5 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center text-xs shrink-0">4</span>
+                        <div>
+                          <p className="text-xs text-foreground">Key kept secret</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* How it works */}
+                  <div className="bg-muted/20 rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-foreground mb-3">🔢 How It Works</h4>
+                    <div className="space-y-2 text-sm">
+                      <p className="text-muted-foreground">
+                        <strong className="text-foreground">Encryption:</strong> Add each plaintext letter's position to the corresponding key letter's position (mod 26)
+                      </p>
+                      <p className="text-muted-foreground">
+                        <strong className="text-foreground">Decryption:</strong> Subtract each key letter's position from the ciphertext letter's position (mod 26)
+                      </p>
+                      <div className="font-mono text-xs bg-background/50 p-2 rounded mt-2">
+                        Encrypt: C[i] = (P[i] + K[i]) mod 26<br />
+                        Decrypt: P[i] = (C[i] - K[i]) mod 26
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Warning */}
+                  <div className="bg-yellow-500/10 rounded-lg p-4 border border-yellow-500/30">
+                    <h4 className="text-sm font-medium text-yellow-400 mb-2 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" /> Critical Weakness
+                    </h4>
+                    <p className="text-xs text-muted-foreground">
+                      If the key is ever reused, the cipher can be broken. An attacker with two ciphertexts encrypted with the same key can XOR them to reveal both messages.
+                    </p>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
           <div className="grid md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
@@ -237,6 +325,49 @@ export default function OneTimePadCipher() {
               <RotateCcw className="w-4 h-4" />
             </Button>
           </div>
+
+          {/* Output - shows in controls */}
+          {isKeyValid && (
+            <div className={cn(
+              "rounded-lg p-3",
+              mode === "decrypt" ? "bg-green-500/10 border border-green-500/30" : "bg-primary/10 border border-primary/30"
+            )}>
+              <div className="flex items-center justify-between mb-1">
+                <div className="text-xs text-muted-foreground">
+                  {mode === "encrypt" ? "Ciphertext" : "Plaintext"}
+                </div>
+                {hasAnimated && !isAnimating && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      "h-7 px-3 text-xs font-medium transition-colors",
+                      mode === "encrypt" 
+                        ? "border-green-500/50 text-green-400 hover:bg-green-500/10 hover:text-green-300"
+                        : "border-primary/50 text-primary hover:bg-primary/10 hover:text-primary"
+                    )}
+                    onClick={() => {
+                      const result = processText(inputText, key);
+                      setInputText(result);
+                      setMode(mode === "encrypt" ? "decrypt" : "encrypt");
+                      resetAnimation();
+                    }}
+                  >
+                    {mode === "encrypt" ? "→ Decrypt" : "→ Encrypt"}
+                  </Button>
+                )}
+              </div>
+              <div className={cn(
+                "font-mono text-lg break-all min-h-[1.75rem]",
+                mode === "decrypt" ? "text-green-400" : "text-primary"
+              )}>
+                {hasAnimated 
+                  ? (isAnimating ? outputText : processText(inputText, key))
+                  : <span className="text-muted-foreground text-sm italic">Click Animate to see result</span>
+                }
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Progress */}
@@ -321,16 +452,20 @@ export default function OneTimePadCipher() {
                 {mode === "encrypt" ? "Ciphertext" : "Plaintext"}
               </p>
               <div className="flex flex-wrap gap-1">
-                {(isAnimating ? outputText : processText(inputText, key)).split("").map((letter, i) => (
-                  <LetterBox
-                    key={`output-${i}`}
-                    letter={letter}
-                    variant="output"
-                    isHighlighted={i === activeIndex - 1}
-                    showIndex
-                    index={ALPHABET.indexOf(letter)}
-                  />
-                ))}
+                {hasAnimated ? (
+                  (isAnimating ? outputText : processText(inputText, key)).split("").map((letter, i) => (
+                    <LetterBox
+                      key={`output-${i}`}
+                      letter={letter}
+                      variant="output"
+                      isHighlighted={i === activeIndex - 1}
+                      showIndex
+                      index={ALPHABET.indexOf(letter)}
+                    />
+                  ))
+                ) : (
+                  <span className="text-muted-foreground text-sm italic">Click Animate to see result</span>
+                )}
               </div>
             </div>
           </div>
@@ -446,118 +581,7 @@ export default function OneTimePadCipher() {
           </div>
         )}
 
-        {/* Explanation */}
-        <div className="glass-card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-foreground">About One-Time Pad</h3>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowTutorial(!showTutorial)}
-            >
-              <Info className="w-4 h-4 mr-1" />
-              {showTutorial ? "Hide" : "Show"}
-            </Button>
-          </div>
-
-          {showTutorial && (
-            <div className="space-y-6">
-              {/* Perfect Secrecy */}
-              <div className="bg-green-500/10 rounded-lg p-4 border border-green-500/30">
-                <h4 className="text-sm font-medium text-green-400 mb-3 flex items-center gap-2">
-                  <Shield className="w-4 h-4" /> Perfect Secrecy
-                </h4>
-                <p className="text-sm text-muted-foreground">
-                  The One-Time Pad is the <strong className="text-foreground">only cipher mathematically proven to be unbreakable</strong> 
-                  when used correctly. This was proven by Claude Shannon in 1949. Without the key, 
-                  the ciphertext could decrypt to any message of the same length with equal probability.
-                </p>
-              </div>
-
-              {/* Requirements */}
-              <div className="bg-muted/20 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-foreground mb-3">📋 Requirements for Perfect Security</h4>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <div className="flex items-start gap-2">
-                      <span className="w-5 h-5 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center text-xs shrink-0">1</span>
-                      <div>
-                        <p className="text-sm text-foreground">Key is truly random</p>
-                        <p className="text-xs text-muted-foreground">Not pseudo-random, must be genuinely random</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="w-5 h-5 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center text-xs shrink-0">2</span>
-                      <div>
-                        <p className="text-sm text-foreground">Key ≥ Message length</p>
-                        <p className="text-xs text-muted-foreground">Each message character needs its own key character</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-start gap-2">
-                      <span className="w-5 h-5 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center text-xs shrink-0">3</span>
-                      <div>
-                        <p className="text-sm text-foreground">Key used only once</p>
-                        <p className="text-xs text-muted-foreground">Never reuse the key for another message</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="w-5 h-5 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center text-xs shrink-0">4</span>
-                      <div>
-                        <p className="text-sm text-foreground">Key kept completely secret</p>
-                        <p className="text-xs text-muted-foreground">Only sender and receiver know the key</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* How it works */}
-              <div className="bg-muted/20 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-foreground mb-3">🔢 How It Works</h4>
-                <div className="space-y-2 text-sm">
-                  <p className="text-muted-foreground">
-                    <strong className="text-foreground">Encryption:</strong> Add each plaintext letter's position to the corresponding key letter's position (mod 26)
-                  </p>
-                  <p className="text-muted-foreground">
-                    <strong className="text-foreground">Decryption:</strong> Subtract each key letter's position from the ciphertext letter's position (mod 26)
-                  </p>
-                  <div className="font-mono text-xs bg-background/50 p-2 rounded mt-2">
-                    Encrypt: C[i] = (P[i] + K[i]) mod 26<br />
-                    Decrypt: P[i] = (C[i] - K[i]) mod 26
-                  </div>
-                </div>
-              </div>
-
-              {/* Warning */}
-              <div className="bg-yellow-500/10 rounded-lg p-4 border border-yellow-500/30">
-                <h4 className="text-sm font-medium text-yellow-400 mb-2 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" /> Critical Weakness
-                </h4>
-                <p className="text-xs text-muted-foreground">
-                  If the key is ever reused (even partially), the cipher can be broken. This is because:
-                  <br /><br />
-                  <code className="bg-background/50 px-1 rounded">C₁ ⊕ C₂ = P₁ ⊕ P₂</code>
-                  <br /><br />
-                  An attacker with two ciphertexts encrypted with the same key can XOR them to get the XOR of the plaintexts, 
-                  which often reveals both messages through frequency analysis. This is called a "two-time pad" attack.
-                </p>
-              </div>
-
-              {/* Historical Use */}
-              <div className="bg-primary/10 rounded-lg p-4 border border-primary/30">
-                <h4 className="text-sm font-medium text-primary mb-2">📜 Historical Use</h4>
-                <p className="text-xs text-muted-foreground">
-                  The One-Time Pad was used for the Moscow–Washington hotline during the Cold War, 
-                  and by spies who carried key material on "one-time pads" of paper that were destroyed after use.
-                  Today, quantum key distribution (QKD) aims to solve the key distribution problem securely.
-                </p>
-              </div>
-            </div>
-          )}
         </div>
-      </div>
     </CipherLayout>
   );
 }
