@@ -191,7 +191,7 @@ function leftShift(bits: number[], shifts: number): number[] {
 
 // Key Schedule
 function generateSubkeys(key: string): number[][] {
-  let keyBits = stringToBits(key.padEnd(8, '\0').slice(0, 8));
+  const keyBits = stringToBits(key.padEnd(8, '\0').slice(0, 8));
   while (keyBits.length < 64) keyBits.push(0);
   
   const permutedKey = permute(keyBits, PC1);
@@ -247,11 +247,16 @@ interface DESStep {
   xored?: number[];
   sboxOutputs?: number[][];
   feistelOutput?: number[];
+  blockInfo?: {
+    currentBlock: number;
+    totalBlocks: number;
+    blocks: string[];
+  };
 }
 
 function desEncryptWithSteps(plaintext: string, key: string): DESStep[] {
   const steps: DESStep[] = [];
-  let inputBits = stringToBits(plaintext.padEnd(8, '\0').slice(0, 8));
+  const inputBits = stringToBits(plaintext.padEnd(8, '\0').slice(0, 8));
   while (inputBits.length < 64) inputBits.push(0);
   
   const subkeys = generateSubkeys(key);
@@ -323,7 +328,7 @@ function desEncryptWithSteps(plaintext: string, key: string): DESStep[] {
 
 function desDecryptWithSteps(ciphertext: string, key: string): DESStep[] {
   const steps: DESStep[] = [];
-  let inputBits = stringToBits(ciphertext.padEnd(8, '\0').slice(0, 8));
+  const inputBits = stringToBits(ciphertext.padEnd(8, '\0').slice(0, 8));
   while (inputBits.length < 64) inputBits.push(0);
   
   const subkeys = generateSubkeys(key);
@@ -392,6 +397,85 @@ function desDecryptWithSteps(ciphertext: string, key: string): DESStep[] {
   });
   
   return steps;
+}
+
+// Multi-block DES functions
+function desEncryptMultiBlock(plaintext: string, key: string): DESStep[] {
+  const allSteps: DESStep[] = [];
+  const blocks = [];
+  
+  // Split into 8-byte blocks with padding
+  for (let i = 0; i < plaintext.length; i += 8) {
+    const block = plaintext.slice(i, i + 8).padEnd(8, '\0');
+    blocks.push(block);
+  }
+  
+  // Ensure at least one block
+  if (blocks.length === 0) {
+    blocks.push(plaintext.padEnd(8, '\0').slice(0, 8));
+  }
+  
+  allSteps.push({
+    name: "Block Division",
+    description: `Split input into ${blocks.length} block(s) of 8 bytes each`,
+    type: "initial",
+    L: [],
+    R: [],
+    blockInfo: { currentBlock: 0, totalBlocks: blocks.length, blocks }
+  });
+  
+  blocks.forEach((block, blockIndex) => {
+    const blockSteps = desEncryptWithSteps(block, key);
+    blockSteps.forEach((step, stepIndex) => {
+      allSteps.push({
+        ...step,
+        name: `Block ${blockIndex + 1}: ${step.name}`,
+        description: `Block ${blockIndex + 1}/${blocks.length}: ${step.description}`,
+        blockInfo: { currentBlock: blockIndex, totalBlocks: blocks.length, blocks }
+      });
+    });
+  });
+  
+  return allSteps;
+}
+
+function desDecryptMultiBlock(ciphertext: string, key: string): DESStep[] {
+  const allSteps: DESStep[] = [];
+  const blocks = [];
+  
+  // Split into 8-byte blocks
+  for (let i = 0; i < ciphertext.length; i += 8) {
+    const block = ciphertext.slice(i, i + 8).padEnd(8, '\0');
+    blocks.push(block);
+  }
+  
+  // Ensure at least one block
+  if (blocks.length === 0) {
+    blocks.push(ciphertext.padEnd(8, '\0').slice(0, 8));
+  }
+  
+  allSteps.push({
+    name: "Block Division",
+    description: `Split ciphertext into ${blocks.length} block(s) of 8 bytes each`,
+    type: "initial",
+    L: [],
+    R: [],
+    blockInfo: { currentBlock: 0, totalBlocks: blocks.length, blocks }
+  });
+  
+  blocks.forEach((block, blockIndex) => {
+    const blockSteps = desDecryptWithSteps(block, key);
+    blockSteps.forEach((step, stepIndex) => {
+      allSteps.push({
+        ...step,
+        name: `Block ${blockIndex + 1}: ${step.name}`,
+        description: `Block ${blockIndex + 1}/${blocks.length}: ${step.description}`,
+        blockInfo: { currentBlock: blockIndex, totalBlocks: blocks.length, blocks }
+      });
+    });
+  });
+  
+  return allSteps;
 }
 
 // Components
@@ -468,27 +552,56 @@ function FeistelDiagram({ step }: { step: DESStep }) {
 }
 
 export default function DESCipher() {
-  const [inputText, setInputText] = useState("HELLO123");
-  const [key, setKey] = useState("SECRETKY");
-  const [mode, setMode] = useState<"encrypt" | "decrypt">("encrypt");
+  const [inputText, setInputText] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('des-input-text') || "HELLO WORLD DES!";
+    }
+    return "HELLO WORLD DES!";
+  });
+  const [key, setKey] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('des-key') || "SECRETKY";
+    }
+    return "SECRETKY";
+  });
+  const [mode, setMode] = useState<"encrypt" | "decrypt">(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('des-mode') as "encrypt" | "decrypt") || "encrypt";
+    }
+    return "encrypt";
+  });
   const [activeStep, setActiveStep] = useState(-1);
   const [isAnimating, setIsAnimating] = useState(false);
   const [hasAnimated, setHasAnimated] = useState(false);
   const [showKey, setShowKey] = useState(false);
 
-  const paddedInput = inputText.padEnd(8, '\0').slice(0, 8);
+  // Save to localStorage when values change
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('des-input-text', inputText);
+    }
+  }, [inputText]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('des-key', key);
+    }
+  }, [key]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('des-mode', mode);
+    }
+  }, [mode]);
+
+  const paddedInput = inputText; // Don't limit to 8 chars for multi-block
   const paddedKey = key.padEnd(8, '\0').slice(0, 8);
 
   const steps = useMemo(() => {
     if (mode === "encrypt") {
-      return desEncryptWithSteps(paddedInput, paddedKey);
+      return desEncryptMultiBlock(paddedInput, paddedKey);
     } else {
-      // For decrypt, first encrypt to get ciphertext, then show decrypt steps
-      const encSteps = desEncryptWithSteps(paddedInput, paddedKey);
-      const lastStep = encSteps[encSteps.length - 1];
-      const cipherBits = [...lastStep.L, ...lastStep.R];
-      const ciphertext = bitsToString(cipherBits);
-      return desDecryptWithSteps(ciphertext, paddedKey);
+      return desDecryptMultiBlock(paddedInput, paddedKey);
     }
   }, [paddedInput, paddedKey, mode]);
 
@@ -500,9 +613,25 @@ export default function DESCipher() {
 
   const finalOutput = useMemo(() => {
     if (steps.length === 0) return "";
-    const lastStep = steps[steps.length - 1];
-    const bits = [...lastStep.L, ...lastStep.R];
-    return bitsToHex(bits);
+    
+    // Collect all final block results
+    const blockResults = [];
+    let currentBlock = -1;
+    
+    for (let i = steps.length - 1; i >= 0; i--) {
+      const step = steps[i];
+      if (step.blockInfo && step.blockInfo.currentBlock !== currentBlock && step.type === "fp") {
+        const bits = [...step.L, ...step.R];
+        blockResults.unshift(bitsToHex(bits));
+        currentBlock = step.blockInfo.currentBlock;
+      } else if (!step.blockInfo && step.type === "fp") {
+        // Single block mode
+        const bits = [...step.L, ...step.R];
+        return bitsToHex(bits);
+      }
+    }
+    
+    return blockResults.join("");
   }, [steps]);
 
   const startAnimation = () => {
@@ -604,17 +733,24 @@ export default function DESCipher() {
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                {mode === "encrypt" ? "Plaintext (8 bytes)" : "Input Text"}
+                {mode === "encrypt" ? "Plaintext" : "Input Text"}
               </label>
               <input
                 type="text"
                 value={inputText}
-                onChange={(e) => setInputText(e.target.value.slice(0, 8))}
+                onChange={(e) => setInputText(e.target.value.slice(0, 32))}
                 className="w-full bg-input border border-border rounded-lg px-4 py-3 font-mono text-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="Enter 8 characters..."
-                maxLength={8}
+                placeholder="Enter text (blocks of 8 chars)..."
+                maxLength={32}
               />
-              <p className="text-xs text-muted-foreground mt-1">{inputText.length}/8 bytes</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {inputText.length}/32 chars • DES processes in 8-byte blocks
+                {inputText.length > 8 && (
+                  <span className="text-yellow-400 ml-1">
+                    ({Math.ceil(inputText.length / 8)} blocks)
+                  </span>
+                )}
+              </p>
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
@@ -675,6 +811,52 @@ export default function DESCipher() {
                         : "border-primary/50 text-primary hover:bg-primary/10"
                     )}
                     onClick={() => {
+                      // Convert final output to ASCII text for decryption
+                      if (mode === "encrypt" && steps.length > 0) {
+                        // Collect all final block results as ASCII text
+                        const blockResults = [];
+                        let currentBlock = -1;
+                        
+                        for (let i = steps.length - 1; i >= 0; i--) {
+                          const step = steps[i];
+                          if (step.blockInfo && step.blockInfo.currentBlock !== currentBlock && step.type === "fp") {
+                            const bits = [...step.L, ...step.R];
+                            const resultText = bitsToString(bits);
+                            blockResults.unshift(resultText);
+                            currentBlock = step.blockInfo.currentBlock;
+                          } else if (!step.blockInfo && step.type === "fp") {
+                            // Single block mode
+                            const bits = [...step.L, ...step.R];
+                            const resultText = bitsToString(bits);
+                            blockResults.push(resultText);
+                            break;
+                          }
+                        }
+                        
+                        setInputText(blockResults.join(""));
+                      } else if (mode === "decrypt" && steps.length > 0) {
+                        // Similar logic for decrypt mode
+                        const blockResults = [];
+                        let currentBlock = -1;
+                        
+                        for (let i = steps.length - 1; i >= 0; i--) {
+                          const step = steps[i];
+                          if (step.blockInfo && step.blockInfo.currentBlock !== currentBlock && step.type === "fp") {
+                            const bits = [...step.L, ...step.R];
+                            const resultText = bitsToString(bits);
+                            blockResults.unshift(resultText);
+                            currentBlock = step.blockInfo.currentBlock;
+                          } else if (!step.blockInfo && step.type === "fp") {
+                            // Single block mode
+                            const bits = [...step.L, ...step.R];
+                            const resultText = bitsToString(bits);
+                            blockResults.push(resultText);
+                            break;
+                          }
+                        }
+                        
+                        setInputText(blockResults.join(""));
+                      }
                       setMode(mode === "encrypt" ? "decrypt" : "encrypt");
                       resetAnimation();
                     }}
@@ -690,7 +872,57 @@ export default function DESCipher() {
                     "font-mono text-sm break-all",
                     mode === "decrypt" ? "text-green-500" : "text-primary"
                   )}>
-                    {hasAnimated ? finalOutput : "Click Animate"}
+                    {!isAnimating && hasAnimated ? finalOutput : 
+                     hasAnimated && activeStep >= 0 ? (() => {
+                       // Show progressive building of result for each step
+                       const results = [];
+                       let completedBlocks = -1;
+                       let currentBlockProgress = "";
+                       
+                       // Find completed blocks and current block progress
+                       for (let i = 0; i <= activeStep && i < steps.length; i++) {
+                         const step = steps[i];
+                         
+                         if (step.blockInfo && step.type === "fp" && step.blockInfo.currentBlock > completedBlocks) {
+                           // Block completed
+                           completedBlocks = step.blockInfo.currentBlock;
+                           const bits = [...step.L, ...step.R];
+                           results.push(bitsToHex(bits));
+                         } else if (step.blockInfo && step.blockInfo.currentBlock === completedBlocks + 1) {
+                           // Current block in progress
+                           if (step.type === "round" || step.type === "fp" || step.type === "swap") {
+                             const bits = [...step.L, ...step.R];
+                             currentBlockProgress = bitsToHex(bits);
+                           }
+                         }
+                       }
+                       
+                       const currentStep = activeStep >= 0 ? steps[activeStep] : null;
+                       const totalBlocks = currentStep?.blockInfo?.totalBlocks || 1;
+                       
+                       // Combine completed blocks + current progress
+                       const completedText = results.join("");
+                       
+                       // Show current block progress or placeholder
+                       let progressText = "";
+                       if (currentBlockProgress && completedBlocks + 1 < totalBlocks) {
+                         progressText = currentBlockProgress;
+                       } else if (results.length < totalBlocks) {
+                         progressText = "????????".repeat(Math.max(0, totalBlocks - results.length));
+                       }
+                       
+                       return (
+                         <span>
+                           <span className={mode === "decrypt" ? "text-green-400" : "text-primary"}>{completedText}</span>
+                           {progressText && (
+                             <span className={currentBlockProgress ? "text-yellow-400 animate-pulse" : "text-muted-foreground"}>
+                               {progressText}
+                             </span>
+                           )}
+                         </span>
+                       );
+                     })() : 
+                     "Click Animate to see result"}
                   </div>
                 </div>
                 <div>
@@ -699,11 +931,112 @@ export default function DESCipher() {
                     "font-mono text-sm",
                     mode === "decrypt" ? "text-green-500" : "text-primary"
                   )}>
-                    {hasAnimated && steps.length > 0 ? bitsToString([...steps[steps.length - 1].L, ...steps[steps.length - 1].R]).replace(/[\x00-\x1F\x7F-\xFF]/g, '·') : "-"}
+                    {!isAnimating && hasAnimated && steps.length > 0 ? 
+                      (() => {
+                        // Collect all final block results as ASCII text
+                        const blockResults = [];
+                        let currentBlock = -1;
+                        
+                        for (let i = steps.length - 1; i >= 0; i--) {
+                          const step = steps[i];
+                          if (step.blockInfo && step.blockInfo.currentBlock !== currentBlock && step.type === "fp") {
+                            const bits = [...step.L, ...step.R];
+                            const resultText = bitsToString(bits);
+                            blockResults.unshift(resultText);
+                            currentBlock = step.blockInfo.currentBlock;
+                          } else if (!step.blockInfo && step.type === "fp") {
+                            // Single block mode
+                            const bits = [...step.L, ...step.R];
+                            const resultText = bitsToString(bits);
+                            blockResults.push(resultText);
+                            break;
+                          }
+                        }
+                        
+                        return blockResults.join("").replace(/[^\u0020-\u007E]/g, '·');
+                      })() :
+                      hasAnimated && activeStep >= 0 ? (() => {
+                        // Show progressive building of ASCII result with current step
+                        const results = [];
+                        let completedBlocks = -1;
+                        let currentBlockProgress = "";
+                        
+                        // Find completed blocks and current block progress
+                        for (let i = 0; i <= activeStep && i < steps.length; i++) {
+                          const step = steps[i];
+                          
+                          if (step.blockInfo && step.type === "fp" && step.blockInfo.currentBlock > completedBlocks) {
+                            // Block completed
+                            completedBlocks = step.blockInfo.currentBlock;
+                            const bits = [...step.L, ...step.R];
+                            const resultText = bitsToString(bits).replace(/[^\u0020-\u007E]/g, '·');
+                            results.push(resultText);
+                          } else if (step.blockInfo && step.blockInfo.currentBlock === completedBlocks + 1) {
+                            // Current block in progress
+                            if (step.type === "round" || step.type === "fp" || step.type === "swap") {
+                              const bits = [...step.L, ...step.R];
+                              const resultText = bitsToString(bits).replace(/[^\u0020-\u007E]/g, '·');
+                              currentBlockProgress = resultText;
+                            }
+                          }
+                        }
+                        
+                        const currentStep = activeStep >= 0 ? steps[activeStep] : null;
+                        const totalBlocks = currentStep?.blockInfo?.totalBlocks || 1;
+                        
+                        // Combine completed blocks + current progress
+                        const completedText = results.join("");
+                        
+                        // Show current block progress or placeholder
+                        let progressText = "";
+                        if (currentBlockProgress && completedBlocks + 1 < totalBlocks) {
+                          progressText = currentBlockProgress;
+                        } else if (results.length < totalBlocks) {
+                          progressText = "········".repeat(Math.max(0, totalBlocks - results.length));
+                        }
+                        
+                        return (
+                          <span>
+                            <span className={mode === "decrypt" ? "text-green-400" : "text-primary"}>{completedText}</span>
+                            {progressText && (
+                              <span className={currentBlockProgress ? "text-yellow-400 animate-pulse" : "text-muted-foreground"}>
+                                {progressText}
+                              </span>
+                            )}
+                          </span>
+                        );
+                      })() :
+                      "Processing..."}
                   </div>
                 </div>
               </div>
             </div>
+
+           
+              <div className="border-t border-border pt-4">
+        
+         
+                
+                {/* Legend */}
+                <div className="flex items-center justify-center gap-3 mt-3 text-xs">
+                  <div className="flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+                    <span className="text-muted-foreground">Round</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                    <span className="text-muted-foreground">IP</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-orange-400" />
+                    <span className="text-muted-foreground">Swap</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                    <span className="text-muted-foreground">FP</span>
+                  </div>
+                </div>
+              </div>
           </div>
 
           {/* Right - Step Navigation & L/R display */}
@@ -725,6 +1058,7 @@ export default function DESCipher() {
                 </div>
                 <div className="text-xs text-muted-foreground">
                   Step {displayStep + 1}/{steps.length}
+                  {currentStep?.round && ` • Round ${currentStep.round}`}
                 </div>
               </div>
               <Button 
@@ -781,8 +1115,81 @@ export default function DESCipher() {
               </div>
             )}
 
+            {/* Feistel Detail for round steps - enhanced but same style */}
+            {currentStep?.type === "round" && currentStep.expanded && (
+              <div className="pt-3 border-t border-border">
+                <h4 className="text-sm font-medium text-purple-400 text-center mb-3">Feistel Function</h4>
+                <div className="bg-muted/20 rounded-lg p-4 space-y-4">
+                  {/* Enhanced horizontal flow - same style but bigger */}
+                  <div className="flex items-center justify-center gap-3 flex-wrap text-sm">
+                    <div className="px-4 py-2 bg-orange-500/20 rounded text-orange-400 font-mono text-sm">
+                      E(R)
+                    </div>
+                    <span className="text-muted-foreground text-xl">⊕</span>
+                    <div className="px-4 py-2 bg-green-500/20 rounded text-green-400 font-mono text-sm">
+                      K{currentStep.round}
+                    </div>
+                    <span className="text-muted-foreground text-lg">→</span>
+                    <div className="px-4 py-2 bg-purple-500/20 rounded text-purple-400 font-mono text-sm">
+                      S-boxes
+                    </div>
+                    <span className="text-muted-foreground text-lg">→</span>
+                    <div className="px-4 py-2 bg-purple-500/30 rounded text-purple-300 font-mono text-sm">
+                      P
+                    </div>
+                  </div>
+
+                  {/* Enhanced S-box grid - same layout but bigger */}
+                  <div className="flex justify-center gap-3 flex-wrap">
+                    {currentStep.sboxOutputs?.map((output, i) => (
+                      <div key={i} className="text-center">
+                        <div className="text-xs text-muted-foreground mb-2">S{i + 1}</div>
+                        <div className="font-mono text-sm px-3 py-2 rounded bg-purple-500/20 text-purple-400 min-w-[3rem]">
+                          {output.map(b => b).join('')}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Enhanced final result - same style but bigger */}
+                  <div className="text-center">
+                    <div className="font-mono text-base px-4 py-2 rounded bg-purple-500/30 border border-purple-500/50 text-purple-300 inline-block">
+                      f = {currentStep.feistelOutput ? bitsToHex(currentStep.feistelOutput) : ""}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* DES Structure - Compact */}
+            <div className="pt-3 border-t border-border">
+              <h4 className="text-xs font-medium text-foreground text-center mb-2">DES Round Structure</h4>
+              <div className="bg-muted/10 rounded-lg p-2">
+                <div className="flex items-center justify-center gap-1 flex-wrap text-[10px]">
+                  <div className="px-1.5 py-0.5 rounded bg-muted text-foreground">Text</div>
+                  <span className="text-muted-foreground">→</span>
+                  <div className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">IP</div>
+                  <span className="text-muted-foreground">→</span>
+                  <div className="border border-dashed border-purple-500/50 rounded px-1.5 py-0.5">
+                    <span className="text-purple-400">16×F</span>
+                  </div>
+                  <span className="text-muted-foreground">→</span>
+                  <div className="px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400">Swap</div>
+                  <span className="text-muted-foreground">→</span>
+                  <div className="px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">FP</div>
+                  <span className="text-muted-foreground">→</span>
+                  <div className="px-1.5 py-0.5 rounded bg-primary text-primary-foreground">Cipher</div>
+                </div>
+              </div>
+            </div>
+
             <p className="text-xs text-muted-foreground text-center">
               {currentStep?.description}
+              {currentStep?.blockInfo && (
+                <span className="block mt-1 text-yellow-400">
+                  Processing {currentStep.blockInfo.currentBlock + 1} of {currentStep.blockInfo.totalBlocks} blocks
+                </span>
+              )}
             </p>
               </>
             ) : (
@@ -790,71 +1197,6 @@ export default function DESCipher() {
                 <p className="text-sm italic">Click Animate to see DES steps</p>
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Feistel Detail - Full Width (only for round steps) */}
-        {currentStep?.type === "round" && <FeistelDiagram step={currentStep} />}
-
-        {/* DES Structure - Full Width */}
-        <div className="glass-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-3">DES Round Structure</h3>
-          <div className="flex items-center justify-center gap-1.5 flex-wrap text-xs">
-            <div className="px-2 py-1 rounded bg-muted text-foreground">Plaintext</div>
-            <span className="text-muted-foreground">→</span>
-            <div className="px-2 py-1 rounded bg-blue-500/20 text-blue-400">IP</div>
-            <span className="text-muted-foreground">→</span>
-            <div className="border border-dashed border-purple-500/50 rounded px-2 py-1">
-              <span className="text-purple-400">16 × Feistel</span>
-            </div>
-            <span className="text-muted-foreground">→</span>
-            <div className="px-2 py-1 rounded bg-orange-500/20 text-orange-400">Swap</div>
-            <span className="text-muted-foreground">→</span>
-            <div className="px-2 py-1 rounded bg-green-500/20 text-green-400">FP</div>
-            <span className="text-muted-foreground">→</span>
-            <div className="px-2 py-1 rounded bg-primary text-primary-foreground">Cipher</div>
-          </div>
-        </div>
-
-        {/* Steps Timeline - Full Width */}
-        <div className="glass-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-3">All Steps</h3>
-          <div className="max-h-40 overflow-y-auto space-y-1">
-            {steps.map((step, idx) => (
-              <button
-                key={idx}
-                onClick={() => {
-                  setActiveStep(idx);
-                  setIsAnimating(false);
-                }}
-                className={cn(
-                  "w-full text-left px-2 py-1.5 rounded transition-all flex items-center gap-2",
-                  idx === displayStep
-                    ? "bg-primary/20 border border-primary"
-                    : idx < displayStep
-                    ? "bg-muted/30 border border-transparent"
-                    : "bg-transparent border border-transparent hover:bg-muted/20"
-                )}
-              >
-                <div className={cn(
-                  "w-5 h-5 rounded-full flex items-center justify-center text-xs font-mono shrink-0",
-                  idx === displayStep ? "bg-primary text-primary-foreground" :
-                  idx < displayStep ? "bg-muted-foreground/50 text-background" :
-                  "bg-muted text-muted-foreground"
-                )}>
-                  {idx + 1}
-                </div>
-                <div className={cn(
-                  "w-2 h-2 rounded-full shrink-0",
-                  step.type === "round" ? "bg-purple-400" :
-                  step.type === "ip" ? "bg-blue-400" :
-                  step.type === "fp" ? "bg-green-400" :
-                  step.type === "swap" ? "bg-orange-400" :
-                  "bg-gray-400"
-                )} />
-                <span className="text-xs text-foreground truncate">{step.name}</span>
-              </button>
-            ))}
           </div>
         </div>
       </div>

@@ -4,6 +4,7 @@ import { ModeToggle } from "@/components/ModeToggle";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Play, Pause, RotateCcw, Eye, EyeOff, ChevronLeft, ChevronRight, Info } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 // AES S-box
 const SBOX: number[] = [
@@ -736,34 +737,245 @@ export default function AESCipher() {
                     How It Works
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-lg">
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>How AES Encryption Works</DialogTitle>
+                    <DialogTitle>Advanced Encryption Standard (AES) - Complete Guide</DialogTitle>
                   </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="text-xs space-y-3">
-                      <div className="bg-muted/20 rounded-lg p-3">
-                        <h4 className="font-medium text-foreground mb-2">📊 AES Parameters</h4>
-                        <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                          <li>Block size: <span className="text-primary">128 bits</span> (16 bytes)</li>
-                          <li>Key size: <span className="text-primary">128 bits</span> (this demo)</li>
-                          <li>Rounds: <span className="text-primary">10</span></li>
-                        </ul>
-                      </div>
-                      <div className="bg-muted/20 rounded-lg p-3">
-                        <h4 className="font-medium text-foreground mb-2">🔄 Round Operations</h4>
-                        <div className="space-y-1 text-muted-foreground">
-                          <p><span className="text-orange-400">● SubBytes:</span> S-box substitution</p>
-                          <p><span className="text-blue-400">● ShiftRows:</span> Row rotation</p>
-                          <p><span className="text-purple-400">● MixColumns:</span> Column mixing (not in last round)</p>
-                          <p><span className="text-green-400">● AddRoundKey:</span> XOR with round key</p>
+                  <div className="space-y-6 text-sm">
+                    {/* Overview */}
+                    <div className="bg-primary/10 rounded-lg p-4 border border-primary/30">
+                      <h3 className="font-semibold text-primary mb-3">🔐 Overview</h3>
+                      <p className="text-muted-foreground mb-3">
+                        AES (Advanced Encryption Standard) is a symmetric block cipher established by NIST in 2001. 
+                        It operates on fixed-size blocks of data using a secret key shared between sender and receiver.
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                        <div className="bg-background/50 rounded p-2">
+                          <div className="font-medium text-primary">Block Size</div>
+                          <div className="text-muted-foreground">128 bits (16 bytes)</div>
+                        </div>
+                        <div className="bg-background/50 rounded p-2">
+                          <div className="font-medium text-primary">Key Sizes</div>
+                          <div className="text-muted-foreground">128, 192, 256 bits</div>
+                        </div>
+                        <div className="bg-background/50 rounded p-2">
+                          <div className="font-medium text-primary">Rounds</div>
+                          <div className="text-muted-foreground">10, 12, 14 respectively</div>
                         </div>
                       </div>
-                      <div className="bg-green-500/10 rounded-lg p-3 border border-green-500/30">
-                        <h4 className="font-medium text-green-400 mb-2">✅ Security</h4>
+                    </div>
+
+                    {/* Mathematical Foundation */}
+                    <div className="bg-muted/10 rounded-lg p-4">
+                      <h3 className="font-semibold text-foreground mb-3">📐 Mathematical Foundation</h3>
+                      <div className="space-y-3">
+                        <div className="bg-background/50 rounded p-3">
+                          <h4 className="font-medium text-foreground mb-2">Galois Field GF(2⁸)</h4>
+                          <p className="text-muted-foreground text-xs mb-2">
+                            AES operates in the finite field GF(2⁸) with irreducible polynomial: 
+                            <span className="font-mono bg-muted px-1 mx-1 rounded">x⁸ + x⁴ + x³ + x + 1</span>
+                          </p>
+                          <p className="text-muted-foreground text-xs">
+                            This allows for mathematical operations on bytes while maintaining security properties.
+                          </p>
+                        </div>
+                        
+                        <div className="bg-background/50 rounded p-3">
+                          <h4 className="font-medium text-foreground mb-2">State Matrix</h4>
+                          <p className="text-muted-foreground text-xs">
+                            Data is arranged in a 4×4 byte matrix (column-major order) called the "State". 
+                            All operations are performed on this matrix representation.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Detailed Operations */}
+                    <div className="space-y-4">
+                      <h3 className="font-semibold text-foreground">🔄 Round Operations (Detailed)</h3>
+                      
+                      <div className="bg-orange-500/10 rounded-lg p-4 border border-orange-500/30">
+                        <h4 className="font-medium text-orange-400 mb-3 flex items-center gap-2">
+                          <div className="w-3 h-3 rounded bg-orange-400"></div>
+                          SubBytes Transformation
+                        </h4>
+                        <div className="space-y-2 text-xs">
+                          <p className="text-muted-foreground">
+                            <strong>Purpose:</strong> Non-linear substitution providing confusion (Shannon's principle)
+                          </p>
+                          <p className="text-muted-foreground">
+                            <strong>Process:</strong> Each byte is replaced using the Rijndael S-box, constructed by:
+                          </p>
+                          <ol className="list-decimal list-inside ml-4 space-y-1 text-muted-foreground">
+                            <li>Taking multiplicative inverse in GF(2⁸) (0x00 maps to itself)</li>
+                            <li>Applying affine transformation: b' = Ab + c (where A is a fixed matrix, c is constant 0x63)</li>
+                          </ol>
+                          <div className="bg-background/50 rounded p-2 font-mono text-xs">
+                            Example: 0x53 → S-box → 0xED
+                          </div>
+                          <p className="text-muted-foreground">
+                            <strong>Security:</strong> Provides resistance against differential and linear cryptanalysis
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="bg-blue-500/10 rounded-lg p-4 border border-blue-500/30">
+                        <h4 className="font-medium text-blue-400 mb-3 flex items-center gap-2">
+                          <div className="w-3 h-3 rounded bg-blue-400"></div>
+                          ShiftRows Operation
+                        </h4>
+                        <div className="space-y-2 text-xs">
+                          <p className="text-muted-foreground">
+                            <strong>Purpose:</strong> Provides diffusion by mixing data across columns
+                          </p>
+                          <p className="text-muted-foreground">
+                            <strong>Process:</strong> Cyclically shift rows left by row number:
+                          </p>
+                          <div className="bg-background/50 rounded p-3 space-y-1">
+                            <div className="text-blue-400">Row 0: [a, b, c, d] → [a, b, c, d] (no shift)</div>
+                            <div className="text-blue-400">Row 1: [e, f, g, h] → [f, g, h, e] (shift left 1)</div>
+                            <div className="text-blue-400">Row 2: [i, j, k, l] → [k, l, i, j] (shift left 2)</div>
+                            <div className="text-blue-400">Row 3: [m, n, o, p] → [p, m, n, o] (shift left 3)</div>
+                          </div>
+                          <p className="text-muted-foreground">
+                            <strong>Effect:</strong> Ensures that each column contains data from different original columns
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="bg-purple-500/10 rounded-lg p-4 border border-purple-500/30">
+                        <h4 className="font-medium text-purple-400 mb-3 flex items-center gap-2">
+                          <div className="w-3 h-3 rounded bg-purple-400"></div>
+                          MixColumns Transformation
+                        </h4>
+                        <div className="space-y-2 text-xs">
+                          <p className="text-muted-foreground">
+                            <strong>Purpose:</strong> Maximum diffusion - each output bit depends on all input bits
+                          </p>
+                          <p className="text-muted-foreground">
+                            <strong>Process:</strong> Matrix multiplication in GF(2⁸) using fixed polynomial:
+                          </p>
+                          <div className="bg-background/50 rounded p-3">
+                            <div className="font-mono text-xs text-purple-400 mb-2">
+                              [02 03 01 01]   [s₀]   [s'₀]
+                              [01 02 03 01] × [s₁] = [s'₁]
+                              [01 01 02 03]   [s₂]   [s'₂]
+                              [03 01 01 02]   [s₃]   [s'₃]
+                            </div>
+                          </div>
+                          <p className="text-muted-foreground">
+                            <strong>Example:</strong> s'₀ = (2×s₀) ⊕ (3×s₁) ⊕ (1×s₂) ⊕ (1×s₃)
+                          </p>
+                          <p className="text-muted-foreground">
+                            <strong>Note:</strong> Omitted in final round to prevent easy attack on last round key
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="bg-green-500/10 rounded-lg p-4 border border-green-500/30">
+                        <h4 className="font-medium text-green-400 mb-3 flex items-center gap-2">
+                          <div className="w-3 h-3 rounded bg-green-400"></div>
+                          AddRoundKey Operation
+                        </h4>
+                        <div className="space-y-2 text-xs">
+                          <p className="text-muted-foreground">
+                            <strong>Purpose:</strong> Incorporates the secret key into the encryption process
+                          </p>
+                          <p className="text-muted-foreground">
+                            <strong>Process:</strong> Simple XOR between state matrix and round key matrix
+                          </p>
+                          <div className="bg-background/50 rounded p-2 font-mono text-xs text-green-400">
+                            State[i][j] ⊕ RoundKey[i][j] = NewState[i][j]
+                          </div>
+                          <p className="text-muted-foreground">
+                            <strong>Properties:</strong> Invertible (XOR is its own inverse), computationally efficient
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Key Schedule */}
+                    <div className="bg-yellow-500/10 rounded-lg p-4 border border-yellow-500/30">
+                      <h3 className="font-semibold text-yellow-400 mb-3">🔑 Key Expansion Algorithm</h3>
+                      <div className="space-y-2 text-xs">
                         <p className="text-muted-foreground">
-                          AES is the current standard for symmetric encryption, used worldwide for securing data.
+                          Generates 11 round keys (44 words) from the original 128-bit key using:
                         </p>
+                        <ol className="list-decimal list-inside ml-4 space-y-1 text-muted-foreground">
+                          <li><strong>RotWord:</strong> Cyclically rotates 4-byte word left by 1 position</li>
+                          <li><strong>SubWord:</strong> Applies S-box to each byte of the word</li>
+                          <li><strong>Rcon:</strong> Round constants (powers of x in GF(2⁸)): [01, 02, 04, 08, 10, 20, 40, 80, 1B, 36]</li>
+                        </ol>
+                        <div className="bg-background/50 rounded p-2 font-mono text-xs">
+                          W[i] = W[i-4] ⊕ SubWord(RotWord(W[i-1])) ⊕ Rcon[i/4] (for i ≡ 0 mod 4)
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Security Properties */}
+                    <div className="bg-green-500/10 rounded-lg p-4 border border-green-500/30">
+                      <h3 className="font-semibold text-green-400 mb-3">🛡️ Security Properties</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                        <div className="space-y-2">
+                          <h4 className="font-medium text-foreground">Cryptographic Properties:</h4>
+                          <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                            <li><strong>Confusion:</strong> Output bits have complex dependency on key bits</li>
+                            <li><strong>Diffusion:</strong> Single bit change affects ~50% of output bits</li>
+                            <li><strong>Avalanche Effect:</strong> Small input changes cause large output changes</li>
+                          </ul>
+                        </div>
+                        <div className="space-y-2">
+                          <h4 className="font-medium text-foreground">Attack Resistance:</h4>
+                          <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                            <li><strong>Brute Force:</strong> 2¹²⁸ key space (computationally infeasible)</li>
+                            <li><strong>Differential:</strong> Resistant due to S-box design</li>
+                            <li><strong>Linear:</strong> Low linear bias in S-box</li>
+                            <li><strong>Related Key:</strong> Strong key schedule prevents attacks</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Implementation Notes */}
+                    <div className="bg-blue-500/10 rounded-lg p-4 border border-blue-500/30">
+                      <h3 className="font-semibold text-blue-400 mb-3">⚡ Implementation & Performance</h3>
+                      <div className="space-y-2 text-xs">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <h4 className="font-medium text-foreground mb-1">Hardware Optimizations:</h4>
+                            <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                              <li>AES-NI instructions on modern CPUs</li>
+                              <li>Lookup table implementations</li>
+                              <li>Parallel processing of independent blocks</li>
+                            </ul>
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-foreground mb-1">Side-Channel Considerations:</h4>
+                            <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                              <li>Timing attack mitigation</li>
+                              <li>Cache-timing resistance</li>
+                              <li>Power analysis protection</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Standards & Usage */}
+                    <div className="bg-indigo-500/10 rounded-lg p-4 border border-indigo-500/30">
+                      <h3 className="font-semibold text-indigo-400 mb-3">📜 Standards & Real-World Usage</h3>
+                      <div className="space-y-2 text-xs">
+                        <p className="text-muted-foreground">
+                          <strong>Standardization:</strong> NIST FIPS 197 (2001), ISO/IEC 18033-3 (2005)
+                        </p>
+                        <p className="text-muted-foreground">
+                          <strong>Common Applications:</strong> TLS/SSL, VPNs, disk encryption, wireless security (WPA2/3), government communications
+                        </p>
+                        <div className="bg-background/50 rounded p-2">
+                          <p className="text-muted-foreground">
+                            <strong>Modes of Operation:</strong> CBC, GCM, CTR, ECB (not recommended), XTS (disk encryption)
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -923,27 +1135,92 @@ export default function AESCipher() {
                   />
                 </div>
 
-                {/* Current State Matrix */}
+                {/* Before and After States */}
                 {currentStep && (
-              <div className="flex justify-center">
-                <StateMatrix 
-                  state={currentStep.state} 
-                  label="Current State" 
-                  highlight
-                  colorClass={`border ${
-                    currentStep.operation === "subbytes" ? "bg-orange-500/10 text-orange-400 border-orange-500/50" :
-                    currentStep.operation === "shiftrows" ? "bg-blue-500/10 text-blue-400 border-blue-500/50" :
-                    currentStep.operation === "mixcolumns" ? "bg-purple-500/10 text-purple-400 border-purple-500/50" :
-                    currentStep.operation === "addroundkey" ? "bg-green-500/10 text-green-400 border-green-500/50" :
-                    "bg-primary/10 text-primary border-primary/50"
-                  }`}
-                />
-              </div>
-            )}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-center gap-4">
+                      <StateMatrix 
+                        state={currentStep.prevState} 
+                        label="Before" 
+                        colorClass="bg-muted/50 text-muted-foreground border-border"
+                      />
+                      <div className="flex flex-col items-center gap-1">
+                        <div className={`text-2xl ${
+                          currentStep.operation === "subbytes" ? "text-orange-400" :
+                          currentStep.operation === "shiftrows" ? "text-blue-400" :
+                          currentStep.operation === "mixcolumns" ? "text-purple-400" :
+                          currentStep.operation === "addroundkey" ? "text-green-400" :
+                          "text-primary"
+                        }`}>
+                          →
+                        </div>
+                        <div className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+                          currentStep.operation === "subbytes" ? "bg-orange-500/20 text-orange-400" :
+                          currentStep.operation === "shiftrows" ? "bg-blue-500/20 text-blue-400" :
+                          currentStep.operation === "mixcolumns" ? "bg-purple-500/20 text-purple-400" :
+                          currentStep.operation === "addroundkey" ? "bg-green-500/20 text-green-400" :
+                          "bg-primary/20 text-primary"
+                        }`}>
+                          {currentStep.operation.toUpperCase()}
+                        </div>
+                      </div>
+                      <StateMatrix 
+                        state={currentStep.state} 
+                        label="After" 
+                        highlight
+                        colorClass={`border ${
+                          currentStep.operation === "subbytes" ? "bg-orange-500/10 text-orange-400 border-orange-500/50" :
+                          currentStep.operation === "shiftrows" ? "bg-blue-500/10 text-blue-400 border-blue-500/50" :
+                          currentStep.operation === "mixcolumns" ? "bg-purple-500/10 text-purple-400 border-purple-500/50" :
+                          currentStep.operation === "addroundkey" ? "bg-green-500/10 text-green-400 border-green-500/50" :
+                          "bg-primary/10 text-primary border-primary/50"
+                        }`}
+                      />
+                    </div>
 
-            <p className="text-xs text-muted-foreground text-center">
-              {currentStep?.description}
-            </p>
+                    <p className="text-xs text-muted-foreground text-center">
+                      {currentStep?.description}
+                    </p>
+
+                    {/* Operation-specific detailed diagrams */}
+                    {currentStep.operation === "subbytes" && (
+                      <SubBytesDiagram prevState={currentStep.prevState} state={currentStep.state} />
+                    )}
+                    {currentStep.operation === "shiftrows" && (
+                      <ShiftRowsDiagram prevState={currentStep.prevState} state={currentStep.state} />
+                    )}
+                    {currentStep.operation === "mixcolumns" && (
+                      <MixColumnsDiagram prevState={currentStep.prevState} state={currentStep.state} />
+                    )}
+                    {currentStep.operation === "addroundkey" && currentStep.roundKey && (
+                      <AddRoundKeyDiagram prevState={currentStep.prevState} state={currentStep.state} roundKey={currentStep.roundKey} />
+                    )}
+                  </div>
+                )}
+
+                {/* AES Round Structure */}
+                <div className="pt-4 border-t border-border">
+                  <h4 className="text-sm font-semibold text-foreground mb-3">Round Structure</h4>
+                  <div className="flex items-center justify-center gap-1 flex-wrap text-xs">
+                    <div className="px-1.5 py-0.5 rounded bg-muted text-foreground">Input</div>
+                    <span className="text-muted-foreground">→</span>
+                    <div className="px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">Add</div>
+                    <span className="text-muted-foreground">→</span>
+                    <div className="border border-dashed border-muted-foreground rounded px-1.5 py-0.5 flex items-center gap-0.5">
+                      <span className="text-muted-foreground">×9:</span>
+                      <span className="text-orange-400">S</span>
+                      <span className="text-blue-400">R</span>
+                      <span className="text-purple-400">M</span>
+                      <span className="text-green-400">A</span>
+                    </div>
+                    <span className="text-muted-foreground">→</span>
+                    <div className="border border-primary rounded px-1.5 py-0.5 flex items-center gap-0.5">
+                      <span className="text-orange-400">S</span>
+                      <span className="text-blue-400">R</span>
+                      <span className="text-green-400">A</span>
+                    </div>
+                  </div>
+                </div>
               </>
             ) : (
               <div className="flex items-center justify-center h-full min-h-[200px] text-muted-foreground">
@@ -953,130 +1230,6 @@ export default function AESCipher() {
           </div>
         </div>
 
-        {/* Main Visualization - Full Width */}
-        {currentStep && (
-          <div className="glass-card p-5 space-y-4">
-            {/* Before and After States */}
-            <div className="flex items-center justify-center gap-6 flex-wrap">
-              <StateMatrix 
-                state={currentStep.prevState} 
-                label="Before" 
-                colorClass="bg-muted/50 text-muted-foreground border-border"
-              />
-              <div className="flex flex-col items-center gap-1">
-                <div className={`text-3xl ${
-                  currentStep.operation === "subbytes" ? "text-orange-400" :
-                  currentStep.operation === "shiftrows" ? "text-blue-400" :
-                  currentStep.operation === "mixcolumns" ? "text-purple-400" :
-                  currentStep.operation === "addroundkey" ? "text-green-400" :
-                  "text-primary"
-                }`}>
-                  →
-                </div>
-                <div className={`text-xs font-medium px-2 py-0.5 rounded ${
-                  currentStep.operation === "subbytes" ? "bg-orange-500/20 text-orange-400" :
-                  currentStep.operation === "shiftrows" ? "bg-blue-500/20 text-blue-400" :
-                  currentStep.operation === "mixcolumns" ? "bg-purple-500/20 text-purple-400" :
-                  currentStep.operation === "addroundkey" ? "bg-green-500/20 text-green-400" :
-                  "bg-primary/20 text-primary"
-                }`}>
-                  {currentStep.operation.toUpperCase()}
-                </div>
-              </div>
-              <StateMatrix 
-                state={currentStep.state} 
-                label="After" 
-                highlight
-                colorClass={`border ${
-                  currentStep.operation === "subbytes" ? "bg-orange-500/10 text-orange-400 border-orange-500/50" :
-                  currentStep.operation === "shiftrows" ? "bg-blue-500/10 text-blue-400 border-blue-500/50" :
-                  currentStep.operation === "mixcolumns" ? "bg-purple-500/10 text-purple-400 border-purple-500/50" :
-                  currentStep.operation === "addroundkey" ? "bg-green-500/10 text-green-400 border-green-500/50" :
-                  "bg-primary/10 text-primary border-primary/50"
-                }`}
-              />
-            </div>
-
-            {/* Operation-specific diagrams */}
-            {currentStep.operation === "subbytes" && (
-              <SubBytesDiagram prevState={currentStep.prevState} state={currentStep.state} />
-            )}
-            {currentStep.operation === "shiftrows" && (
-              <ShiftRowsDiagram prevState={currentStep.prevState} state={currentStep.state} />
-            )}
-            {currentStep.operation === "mixcolumns" && (
-              <MixColumnsDiagram prevState={currentStep.prevState} state={currentStep.state} />
-            )}
-            {currentStep.operation === "addroundkey" && currentStep.roundKey && (
-              <AddRoundKeyDiagram prevState={currentStep.prevState} state={currentStep.state} roundKey={currentStep.roundKey} />
-            )}
-          </div>
-        )}
-
-        {/* Round Overview - Full Width */}
-        <div className="glass-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-3">AES Round Structure</h3>
-          <div className="flex items-center justify-center gap-1.5 flex-wrap text-xs">
-            <div className="px-2 py-1 rounded bg-muted text-foreground">Input</div>
-            <span className="text-muted-foreground">→</span>
-            <div className="px-2 py-1 rounded bg-green-500/20 text-green-400">AddRoundKey</div>
-            <span className="text-muted-foreground">→</span>
-            <div className="border border-dashed border-muted-foreground rounded px-2 py-1 flex items-center gap-1">
-              <span className="text-muted-foreground">×9:</span>
-              <span className="text-orange-400">Sub</span>
-              <span className="text-blue-400">Shift</span>
-              <span className="text-purple-400">Mix</span>
-              <span className="text-green-400">Add</span>
-            </div>
-            <span className="text-muted-foreground">→</span>
-            <div className="border border-primary rounded px-2 py-1 flex items-center gap-1">
-              <span className="text-orange-400">Sub</span>
-              <span className="text-blue-400">Shift</span>
-              <span className="text-green-400">Add</span>
-            </div>
-            <span className="text-muted-foreground">→</span>
-            <div className="px-2 py-1 rounded bg-primary text-primary-foreground">Cipher</div>
-          </div>
-        </div>
-
-        {/* Steps Timeline - Full Width */}
-        <div className="glass-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-3">All Steps</h3>
-          <div className="max-h-40 overflow-y-auto space-y-1">
-            {steps.map((step, idx) => (
-              <button
-                key={idx}
-                onClick={() => {
-                  setActiveStep(idx);
-                  setIsAnimating(false);
-                }}
-                className={`w-full text-left px-2 py-1.5 rounded transition-all flex items-center gap-2 ${
-                  idx === displayStep
-                    ? "bg-primary/20 border border-primary"
-                    : idx < displayStep
-                    ? "bg-muted/30 border border-transparent"
-                    : "bg-transparent border border-transparent hover:bg-muted/20"
-                }`}
-              >
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-mono shrink-0 ${
-                  idx === displayStep ? "bg-primary text-primary-foreground" :
-                  idx < displayStep ? "bg-muted-foreground/50 text-background" :
-                  "bg-muted text-muted-foreground"
-                }`}>
-                  {idx + 1}
-                </div>
-                <div className={`w-2 h-2 rounded-full shrink-0 ${
-                  step.operation === "subbytes" ? "bg-orange-400" :
-                  step.operation === "shiftrows" ? "bg-blue-400" :
-                  step.operation === "mixcolumns" ? "bg-purple-400" :
-                  step.operation === "addroundkey" ? "bg-green-400" :
-                  "bg-gray-400"
-                }`} />
-                <span className="text-xs text-foreground truncate">{step.name}</span>
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
     </CipherLayout>
   );
