@@ -74,8 +74,54 @@ function textToState(text: string): AESState {
   return state;
 }
 
+function hexToState(hexString: string): AESState {
+  // Remove spaces and convert to uppercase
+  const cleanHex = hexString.replace(/\s/g, '').toUpperCase();
+  
+  // Pad or truncate to 32 hex chars (16 bytes)
+  const paddedHex = cleanHex.padEnd(32, '0').slice(0, 32);
+  
+  // Convert hex pairs to bytes
+  const bytes: number[] = [];
+  for (let i = 0; i < 32; i += 2) {
+    bytes.push(parseInt(paddedHex.substr(i, 2), 16));
+  }
+  
+  // Convert to state matrix (column-major)
+  const state: AESState = [];
+  for (let c = 0; c < 4; c++) {
+    state.push([bytes[c * 4], bytes[c * 4 + 1], bytes[c * 4 + 2], bytes[c * 4 + 3]]);
+  }
+  return state;
+}
+
 function stateToHex(state: AESState): string[][] {
   return state.map(col => col.map(b => b.toString(16).padStart(2, '0').toUpperCase()));
+}
+
+function stateToText(state: AESState): string {
+  // Convert state matrix back to text (column-major order)
+  const bytes: number[] = [];
+  for (let c = 0; c < 4; c++) {
+    for (let r = 0; r < 4; r++) {
+      bytes.push(state[c][r]);
+    }
+  }
+  
+  // Convert bytes to string, show all characters including spaces
+  let text = '';
+  for (const byte of bytes) {
+    // Convert printable ASCII characters (including spaces)
+    if (byte >= 32 && byte <= 126) {
+      text += String.fromCharCode(byte);
+    } else if (byte === 0) {
+      // Stop at null byte (actual padding)
+      break;
+    }
+    // Skip other non-printable characters
+  }
+  
+  return text;
 }
 
 function copyState(state: AESState): AESState {
@@ -432,14 +478,23 @@ function StateMatrix({
 }) {
   const hex = stateToHex(state);
   return (
-    <div className="flex flex-col items-center">
-      <div className="text-xs text-muted-foreground mb-2">{label}</div>
-      <div className={`grid grid-cols-4 gap-1 p-2 rounded-lg ${highlight ? "ring-2 ring-primary" : ""}`}>
+    <div className="flex flex-col items-center group">
+      <div className="text-xs font-medium text-muted-foreground mb-2.5">{label}</div>
+      <div className={`
+        grid grid-cols-4 gap-1.5 p-3 rounded-xl bg-gradient-to-br from-background/50 to-background/80
+        ${highlight ? "ring-2 ring-primary/70 shadow-lg shadow-primary/20" : "ring-1 ring-border/50"}
+        transition-all duration-300 hover:scale-105
+      `}>
         {[0, 1, 2, 3].map(row => (
           [0, 1, 2, 3].map(col => (
             <div
               key={`${row}-${col}`}
-              className={`w-10 h-10 flex items-center justify-center font-mono text-xs rounded transition-all border ${colorClass}`}
+              className={`
+                w-12 h-12 flex items-center justify-center font-mono text-sm font-semibold rounded-lg
+                transition-all duration-300 border-2
+                ${colorClass}
+                hover:scale-110 hover:shadow-md cursor-default
+              `}
             >
               {hex[col][row]}
             </div>
@@ -462,25 +517,30 @@ function SubBytesDiagram({ prevState, state }: { prevState: AESState; state: AES
   const col = parseInt(inputByte[1], 16);
 
   return (
-    <div className="bg-muted/30 rounded-lg p-4 space-y-4">
-      <h4 className="font-medium text-orange-400 text-center">SubBytes Operation</h4>
-      <div className="flex items-center justify-center gap-4 flex-wrap">
-        <div className="text-center">
-          <div className="text-xs text-muted-foreground mb-1">Input Byte</div>
-          <div className="w-12 h-12 bg-orange-500/20 rounded flex items-center justify-center font-mono text-lg text-orange-400 border border-orange-500/50">
+    <div className="bg-gradient-to-br from-orange-500/10 to-orange-500/5 rounded-xl p-5 space-y-4 border border-orange-500/30 shadow-lg">
+      <h4 className="font-bold text-orange-400 text-center text-sm">SubBytes Operation</h4>
+      <div className="flex items-center justify-center gap-6 flex-wrap">
+        <div className="text-center animate-in fade-in slide-in-from-left duration-500">
+          <div className="text-xs font-medium text-muted-foreground mb-2">Input Byte</div>
+          <div className="w-14 h-14 bg-orange-500/20 rounded-lg flex items-center justify-center font-mono text-xl font-bold text-orange-400 border-2 border-orange-500/60 shadow-md hover:scale-110 transition-transform">
             {inputByte}
           </div>
+          <div className="text-[10px] text-muted-foreground mt-1">Position [0,0]</div>
         </div>
-        <div className="text-2xl text-orange-400">→</div>
-        <div className="text-center">
-          <div className="text-xs text-muted-foreground mb-1">S-box[{row}][{col}]</div>
-          <div className="w-12 h-12 bg-orange-500/30 rounded flex items-center justify-center font-mono text-lg text-orange-300 border border-orange-500/50">
+        <div className="flex flex-col items-center gap-1 animate-in zoom-in duration-300 delay-200">
+          <div className="text-3xl text-orange-400 animate-pulse">→</div>
+          <div className="text-[10px] bg-orange-500/20 px-2 py-0.5 rounded-full text-orange-300">S-box Lookup</div>
+        </div>
+        <div className="text-center animate-in fade-in slide-in-from-right duration-500 delay-100">
+          <div className="text-xs font-medium text-muted-foreground mb-2">S-box[{row}][{col}]</div>
+          <div className="w-14 h-14 bg-orange-500/30 rounded-lg flex items-center justify-center font-mono text-xl font-bold text-orange-300 border-2 border-orange-500/70 shadow-lg ring-2 ring-orange-500/30 hover:scale-110 transition-transform">
             {outputByte}
           </div>
+          <div className="text-[10px] text-orange-300 mt-1 font-medium">Substituted</div>
         </div>
       </div>
-      <p className="text-xs text-muted-foreground text-center">
-        Each byte is replaced by looking up row (first hex digit) and column (second hex digit) in S-box
+      <p className="text-xs text-muted-foreground text-center bg-background/50 rounded-lg p-2">
+        Each byte is replaced using S-box: row = first hex digit ({row}), column = second hex digit ({col})
       </p>
     </div>
   );
@@ -491,22 +551,22 @@ function ShiftRowsDiagram({ prevState, state }: { prevState: AESState; state: AE
   const currHex = stateToHex(state);
 
   return (
-    <div className="bg-muted/30 rounded-lg p-4 space-y-4">
-      <h4 className="font-medium text-blue-400 text-center">ShiftRows Operation</h4>
-      <div className="flex items-center justify-center gap-6 flex-wrap">
-        <div className="space-y-1">
-          <div className="text-xs text-muted-foreground text-center mb-2">Before</div>
+    <div className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 rounded-xl p-5 space-y-4 border border-blue-500/30 shadow-lg">
+      <h4 className="font-bold text-blue-400 text-center text-sm">ShiftRows Operation</h4>
+      <div className="flex items-center justify-center gap-8 flex-wrap">
+        <div className="space-y-1.5 animate-in fade-in slide-in-from-left duration-500">
+          <div className="text-xs font-medium text-muted-foreground text-center mb-2">Before</div>
           {[0, 1, 2, 3].map(row => (
             <div key={row} className="flex gap-1 items-center">
-              <span className="text-xs text-muted-foreground w-16">Row {row} ←{row}</span>
+              <span className="text-[10px] text-muted-foreground w-20">Row {row} ←{row} shift</span>
               {[0, 1, 2, 3].map(col => (
                 <div
                   key={col}
-                  className={`w-8 h-8 flex items-center justify-center font-mono text-xs rounded ${
-                    row === 0 ? "bg-blue-500/20 text-blue-400" :
-                    row === 1 ? "bg-green-500/20 text-green-400" :
-                    row === 2 ? "bg-yellow-500/20 text-yellow-400" :
-                    "bg-red-500/20 text-red-400"
+                  className={`w-9 h-9 flex items-center justify-center font-mono text-xs font-semibold rounded-md border-2 transition-all hover:scale-110 ${
+                    row === 0 ? "bg-blue-500/20 text-blue-400 border-blue-500/40" :
+                    row === 1 ? "bg-green-500/20 text-green-400 border-green-500/40" :
+                    row === 2 ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/40" :
+                    "bg-red-500/20 text-red-400 border-red-500/40"
                   }`}
                 >
                   {prevHex[col][row]}
@@ -515,19 +575,22 @@ function ShiftRowsDiagram({ prevState, state }: { prevState: AESState; state: AE
             </div>
           ))}
         </div>
-        <div className="text-3xl text-blue-400">→</div>
-        <div className="space-y-1">
-          <div className="text-xs text-muted-foreground text-center mb-2">After</div>
+        <div className="flex flex-col items-center gap-1 animate-in zoom-in duration-300 delay-200">
+          <div className="text-3xl text-blue-400 animate-pulse">→</div>
+          <div className="text-[10px] bg-blue-500/20 px-2 py-0.5 rounded-full text-blue-300">Circular Shift</div>
+        </div>
+        <div className="space-y-1.5 animate-in fade-in slide-in-from-right duration-500 delay-100">
+          <div className="text-xs font-medium text-muted-foreground text-center mb-2">After</div>
           {[0, 1, 2, 3].map(row => (
             <div key={row} className="flex gap-1">
               {[0, 1, 2, 3].map(col => (
                 <div
                   key={col}
-                  className={`w-8 h-8 flex items-center justify-center font-mono text-xs rounded ${
-                    row === 0 ? "bg-blue-500/20 text-blue-400" :
-                    row === 1 ? "bg-green-500/20 text-green-400" :
-                    row === 2 ? "bg-yellow-500/20 text-yellow-400" :
-                    "bg-red-500/20 text-red-400"
+                  className={`w-9 h-9 flex items-center justify-center font-mono text-xs font-semibold rounded-md border-2 shadow-md transition-all hover:scale-110 ${
+                    row === 0 ? "bg-blue-500/30 text-blue-300 border-blue-500/50" :
+                    row === 1 ? "bg-green-500/30 text-green-300 border-green-500/50" :
+                    row === 2 ? "bg-yellow-500/30 text-yellow-300 border-yellow-500/50" :
+                    "bg-red-500/30 text-red-300 border-red-500/50"
                   }`}
                 >
                   {currHex[col][row]}
@@ -552,46 +615,46 @@ function MixColumnsDiagram({ prevState, state }: { prevState: AESState; state: A
   const currHex = stateToHex(state);
 
   return (
-    <div className="bg-muted/30 rounded-lg p-4 space-y-4">
-      <h4 className="font-medium text-purple-400 text-center">MixColumns Operation</h4>
-      <div className="flex items-center justify-center gap-4 flex-wrap">
-        <div className="text-center">
-          <div className="text-xs text-muted-foreground mb-1">Fixed Matrix</div>
-          <div className="grid grid-cols-4 gap-0.5 bg-purple-500/20 p-2 rounded">
+    <div className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 rounded-xl p-5 space-y-4 border border-purple-500/30 shadow-lg">
+      <h4 className="font-bold text-purple-400 text-center text-sm">MixColumns Operation</h4>
+      <div className="flex items-center justify-center gap-5 flex-wrap">
+        <div className="text-center animate-in fade-in slide-in-from-left duration-500">
+          <div className="text-xs font-medium text-muted-foreground mb-2">Fixed Matrix</div>
+          <div className="grid grid-cols-4 gap-0.5 bg-purple-500/20 p-2.5 rounded-lg border-2 border-purple-500/40">
             {[[2,3,1,1],[1,2,3,1],[1,1,2,3],[3,1,1,2]].map((row, i) => (
               row.map((val, j) => (
-                <div key={`${i}-${j}`} className="w-6 h-6 flex items-center justify-center font-mono text-xs text-purple-400">
+                <div key={`${i}-${j}`} className="w-7 h-7 flex items-center justify-center font-mono text-sm font-semibold text-purple-400">
                   {val}
                 </div>
               ))
             ))}
           </div>
         </div>
-        <div className="text-xl text-muted-foreground">×</div>
-        <div className="text-center">
-          <div className="text-xs text-muted-foreground mb-1">Column 0</div>
-          <div className="flex flex-col gap-0.5 bg-purple-500/20 p-2 rounded">
+        <div className="text-2xl text-muted-foreground animate-pulse">×</div>
+        <div className="text-center animate-in fade-in zoom-in duration-300 delay-100">
+          <div className="text-xs font-medium text-muted-foreground mb-2">Column 0</div>
+          <div className="flex flex-col gap-0.5 bg-purple-500/20 p-2.5 rounded-lg border-2 border-purple-500/40">
             {[0, 1, 2, 3].map(row => (
-              <div key={row} className="w-8 h-6 flex items-center justify-center font-mono text-xs text-purple-400">
+              <div key={row} className="w-10 h-7 flex items-center justify-center font-mono text-sm font-semibold text-purple-400">
                 {prevHex[0][row]}
               </div>
             ))}
           </div>
         </div>
-        <div className="text-xl text-muted-foreground">=</div>
-        <div className="text-center">
-          <div className="text-xs text-muted-foreground mb-1">New Column 0</div>
-          <div className="flex flex-col gap-0.5 bg-purple-500/30 p-2 rounded">
+        <div className="text-2xl text-purple-400 animate-pulse">=</div>
+        <div className="text-center animate-in fade-in slide-in-from-right duration-500 delay-200">
+          <div className="text-xs font-medium text-muted-foreground mb-2">New Column 0</div>
+          <div className="flex flex-col gap-0.5 bg-purple-500/30 p-2.5 rounded-lg border-2 border-purple-500/50 shadow-lg ring-2 ring-purple-500/30">
             {[0, 1, 2, 3].map(row => (
-              <div key={row} className="w-8 h-6 flex items-center justify-center font-mono text-xs text-purple-300">
+              <div key={row} className="w-10 h-7 flex items-center justify-center font-mono text-sm font-bold text-purple-300">
                 {currHex[0][row]}
               </div>
             ))}
           </div>
         </div>
       </div>
-      <p className="text-xs text-muted-foreground text-center">
-        Each column is multiplied by a fixed matrix in GF(2⁸). This provides diffusion.
+      <p className="text-xs text-muted-foreground text-center bg-background/50 rounded-lg p-2">
+        Each column is multiplied by a fixed matrix in GF(2⁸) - provides diffusion across bytes
       </p>
     </div>
   );
@@ -603,41 +666,44 @@ function AddRoundKeyDiagram({ prevState, state, roundKey }: { prevState: AESStat
   const keyHex = roundKey ? stateToHex(roundKey) : null;
 
   return (
-    <div className="bg-muted/30 rounded-lg p-4 space-y-4">
-      <h4 className="font-medium text-green-400 text-center">AddRoundKey Operation</h4>
-      <div className="flex items-center justify-center gap-3 flex-wrap">
-        <div className="text-center">
-          <div className="text-xs text-muted-foreground mb-1">State</div>
-          <div className="grid grid-cols-4 gap-0.5 p-1 rounded bg-muted/50">
+    <div className="bg-gradient-to-br from-green-500/10 to-green-500/5 rounded-xl p-5 space-y-4 border border-green-500/30 shadow-lg">
+      <h4 className="font-bold text-green-400 text-center text-sm">AddRoundKey Operation</h4>
+      <div className="flex items-center justify-center gap-4 flex-wrap">
+        <div className="text-center animate-in fade-in slide-in-from-left duration-500">
+          <div className="text-xs font-medium text-muted-foreground mb-2">State</div>
+          <div className="grid grid-cols-4 gap-0.5 p-1.5 rounded-lg bg-green-500/10 border-2 border-green-500/30">
             {[0, 1, 2, 3].map(row => (
               [0, 1, 2, 3].map(col => (
-                <div key={`${row}-${col}`} className="w-7 h-7 flex items-center justify-center font-mono text-[10px] text-foreground">
+                <div key={`${row}-${col}`} className="w-8 h-8 flex items-center justify-center font-mono text-xs font-semibold text-green-400">
                   {prevHex[col][row]}
                 </div>
               ))
             ))}
           </div>
         </div>
-        <div className="text-xl text-green-400">⊕</div>
-        <div className="text-center">
-          <div className="text-xs text-muted-foreground mb-1">Round Key</div>
-          <div className="grid grid-cols-4 gap-0.5 p-1 rounded bg-green-500/20">
+        <div className="flex flex-col items-center gap-1 animate-in zoom-in duration-300 delay-100">
+          <div className="text-3xl text-green-400 animate-pulse">⊕</div>
+          <div className="text-[10px] bg-green-500/20 px-2 py-0.5 rounded-full text-green-300">XOR</div>
+        </div>
+        <div className="text-center animate-in fade-in zoom-in duration-300 delay-150">
+          <div className="text-xs font-medium text-muted-foreground mb-2">Round Key</div>
+          <div className="grid grid-cols-4 gap-0.5 p-1.5 rounded-lg bg-green-500/15 border-2 border-green-500/40">
             {keyHex && [0, 1, 2, 3].map(row => (
               [0, 1, 2, 3].map(col => (
-                <div key={`${row}-${col}`} className="w-7 h-7 flex items-center justify-center font-mono text-[10px] text-green-400">
+                <div key={`${row}-${col}`} className="w-8 h-8 flex items-center justify-center font-mono text-xs font-semibold text-green-400">
                   {keyHex[col][row]}
                 </div>
               ))
             ))}
           </div>
         </div>
-        <div className="text-xl text-green-400">=</div>
-        <div className="text-center">
-          <div className="text-xs text-muted-foreground mb-1">Result</div>
-          <div className="grid grid-cols-4 gap-0.5 p-1 rounded bg-green-500/30">
+        <div className="text-2xl text-green-400 animate-pulse">=</div>
+        <div className="text-center animate-in fade-in slide-in-from-right duration-500 delay-200">
+          <div className="text-xs font-medium text-muted-foreground mb-2">Result</div>
+          <div className="grid grid-cols-4 gap-0.5 p-1.5 rounded-lg bg-green-500/30 border-2 border-green-500/50 shadow-lg ring-2 ring-green-500/30">
             {[0, 1, 2, 3].map(row => (
               [0, 1, 2, 3].map(col => (
-                <div key={`${row}-${col}`} className="w-7 h-7 flex items-center justify-center font-mono text-[10px] text-green-300">
+                <div key={`${row}-${col}`} className="w-8 h-8 flex items-center justify-center font-mono text-xs font-bold text-green-300">
                   {currHex[col][row]}
                 </div>
               ))
@@ -645,8 +711,8 @@ function AddRoundKeyDiagram({ prevState, state, roundKey }: { prevState: AESStat
           </div>
         </div>
       </div>
-      <p className="text-xs text-muted-foreground text-center">
-        XOR each byte of the state with the corresponding byte of the round key
+      <p className="text-xs text-muted-foreground text-center bg-background/50 rounded-lg p-2">
+        XOR (⊕) each byte of the state with the corresponding byte of the round key
       </p>
     </div>
   );
@@ -661,6 +727,7 @@ export default function AESCipher() {
   const [hasAnimated, setHasAnimated] = useState(false);
   const [steps, setSteps] = useState<AESStep[]>([]);
   const [showKey, setShowKey] = useState(false);
+  const [revealedChars, setRevealedChars] = useState(0);
 
   const paddedInput = inputText.padEnd(16, '\0').slice(0, 16);
   const paddedKey = key.padEnd(16, '\0').slice(0, 16);
@@ -669,25 +736,34 @@ export default function AESCipher() {
     if (mode === "encrypt") {
       setSteps(aesEncryptWithSteps(paddedInput, paddedKey));
     } else {
-      const encryptedSteps = aesEncryptWithSteps(paddedInput, paddedKey);
-      const cipherState = encryptedSteps[encryptedSteps.length - 1].state;
-      setSteps(aesDecryptWithSteps(cipherState, paddedKey));
+      // In decrypt mode, treat input as hex ciphertext
+      try {
+        const cipherState = hexToState(inputText);
+        setSteps(aesDecryptWithSteps(cipherState, paddedKey));
+      } catch (error) {
+        // If hex parsing fails, try encrypting then decrypting
+        const encryptedSteps = aesEncryptWithSteps(paddedInput, paddedKey);
+        const cipherState = encryptedSteps[encryptedSteps.length - 1].state;
+        setSteps(aesDecryptWithSteps(cipherState, paddedKey));
+      }
     }
     // Reset animation state when inputs change
     setHasAnimated(false);
     setActiveStep(-1);
-  }, [paddedInput, paddedKey, mode]);
+  }, [paddedInput, paddedKey, mode, inputText]);
 
   const startAnimation = () => {
     setIsAnimating(true);
     setHasAnimated(true);
     setActiveStep(0);
+    setRevealedChars(0);
   };
 
   const resetAnimation = () => {
     setIsAnimating(false);
     setHasAnimated(false);
     setActiveStep(-1);
+    setRevealedChars(0);
   };
 
   const goToPrevStep = () => {
@@ -985,17 +1061,19 @@ export default function AESCipher() {
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
-                {mode === "encrypt" ? "Plaintext (16 bytes)" : "Input Text"}
+                {mode === "encrypt" ? "Plaintext (16 bytes)" : "Ciphertext (32 hex characters)"}
               </label>
               <input
                 type="text"
                 value={inputText}
-                onChange={(e) => setInputText(e.target.value.slice(0, 16))}
+                onChange={(e) => setInputText(mode === "encrypt" ? e.target.value.slice(0, 16) : e.target.value.slice(0, 32))}
                 className="w-full bg-input border border-border rounded-lg px-4 py-3 font-mono text-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="Enter 16 characters..."
-                maxLength={16}
+                placeholder={mode === "encrypt" ? "Enter 16 characters..." : "Enter 32 hex chars (e.g., 69C4E0D86A7B0430D8CDB78070B4C55A)"}
+                maxLength={mode === "encrypt" ? 16 : 32}
               />
-              <p className="text-xs text-muted-foreground mt-1">{inputText.length}/16 bytes</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {mode === "encrypt" ? `${inputText.length}/16 bytes` : `${inputText.length}/32 hex chars`}
+              </p>
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
@@ -1055,18 +1133,42 @@ export default function AESCipher() {
               </div>
             </div>
 
-            {/* Output */}
-            <div className={cn(
-              "rounded-lg p-3 border",
-              mode === "decrypt" 
-                ? "bg-green-500/10 border-green-500/30" 
-                : "bg-primary/10 border-primary/30"
-            )}>
-              <div className="flex items-center justify-between mb-1">
-                <div className="text-xs text-muted-foreground">
-                  {mode === "encrypt" ? "Ciphertext" : "Plaintext"}
+            {/* Current State Output (During Animation) - Hide when complete */}
+            {!(hasAnimated && !isAnimating && activeStep >= steps.length - 1) && (
+              <div className={cn(
+                "rounded-lg p-3 border",
+                mode === "decrypt" 
+                  ? "bg-muted/30 border-muted" 
+                  : "bg-muted/30 border-muted"
+              )}>
+                <div className="text-xs text-muted-foreground mb-1">
+                  {mode === "encrypt" ? "Current State (Hex)" : "Current State (Hex)"}
                 </div>
-                {hasAnimated && !isAnimating && (
+                <div className="font-mono text-sm break-all min-h-[40px] flex items-center text-muted-foreground">
+                  {hasAnimated && steps.length > 0 && currentStep
+                    ? stateToHex(currentStep.state).flat().join("")
+                    : "Click Animate to see transformation"}
+                </div>
+              </div>
+            )}
+
+            {/* Final Output (Only when animation completes) */}
+            {hasAnimated && !isAnimating && activeStep >= steps.length - 1 && (
+              <div className={cn(
+                "rounded-lg p-4 border-2",
+                mode === "decrypt" 
+                  ? "bg-green-500/10 border-green-500/50" 
+                  : "bg-primary/10 border-primary/50"
+              )}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <div className="text-sm font-semibold">
+                      {mode === "encrypt" ? "Final Ciphertext" : "Final Plaintext"}
+                    </div>
+                  </div>
                   <Button
                     variant="outline"
                     size="sm"
@@ -1077,23 +1179,37 @@ export default function AESCipher() {
                         : "border-primary/50 text-primary hover:bg-primary/10"
                     )}
                     onClick={() => {
+                      if (mode === "encrypt" && steps.length > 0) {
+                        const cipherHex = stateToHex(steps[steps.length - 1].state).flat().join("");
+                        setInputText(cipherHex);
+                      }
                       setMode(mode === "encrypt" ? "decrypt" : "encrypt");
                       resetAnimation();
                     }}
                   >
                     {mode === "encrypt" ? "→ Decrypt" : "→ Encrypt"}
                   </Button>
-                )}
+                </div>
+                <div className="space-y-2">
+                  <div className={cn(
+                    "font-mono text-lg font-bold break-all",
+                    mode === "decrypt" ? "text-green-400" : "text-primary"
+                  )}>
+                    {mode === "encrypt" 
+                      ? stateToHex(steps[steps.length - 1].state).flat().join("")
+                      : stateToText(steps[steps.length - 1].state) || stateToHex(steps[steps.length - 1].state).flat().join("")}
+                  </div>
+                  {mode === "decrypt" && (
+                    <div className="text-xs text-muted-foreground font-mono">
+                      Bytes: {stateToHex(steps[steps.length - 1].state).flat().join(" ")}
+                    </div>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground mt-2">
+                  {mode === "encrypt" ? "32 hex characters (128 bits)" : "Decrypted message"}
+                </div>
               </div>
-              <div className={cn(
-                "font-mono text-sm break-all",
-                mode === "decrypt" ? "text-green-500" : "text-primary"
-              )}>
-                {hasAnimated && steps.length > 0 
-                  ? stateToHex(steps[steps.length - 1].state).flat().join("")
-                  : "Click Animate to see result"}
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Right - Step Navigation & State */}
@@ -1137,15 +1253,17 @@ export default function AESCipher() {
 
                 {/* Before and After States */}
                 {currentStep && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-center gap-4">
-                      <StateMatrix 
-                        state={currentStep.prevState} 
-                        label="Before" 
-                        colorClass="bg-muted/50 text-muted-foreground border-border"
-                      />
-                      <div className="flex flex-col items-center gap-1">
-                        <div className={`text-2xl ${
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-center gap-6">
+                      <div className="animate-in fade-in slide-in-from-left-4 duration-500">
+                        <StateMatrix 
+                          state={currentStep.prevState} 
+                          label="Before" 
+                          colorClass="bg-muted/50 text-muted-foreground border-muted"
+                        />
+                      </div>
+                      <div className="flex flex-col items-center gap-2 animate-in zoom-in duration-300 delay-200">
+                        <div className={`text-3xl animate-pulse ${
                           currentStep.operation === "subbytes" ? "text-orange-400" :
                           currentStep.operation === "shiftrows" ? "text-blue-400" :
                           currentStep.operation === "mixcolumns" ? "text-purple-400" :
@@ -1154,28 +1272,30 @@ export default function AESCipher() {
                         }`}>
                           →
                         </div>
-                        <div className={`text-xs font-medium px-1.5 py-0.5 rounded ${
-                          currentStep.operation === "subbytes" ? "bg-orange-500/20 text-orange-400" :
-                          currentStep.operation === "shiftrows" ? "bg-blue-500/20 text-blue-400" :
-                          currentStep.operation === "mixcolumns" ? "bg-purple-500/20 text-purple-400" :
-                          currentStep.operation === "addroundkey" ? "bg-green-500/20 text-green-400" :
-                          "bg-primary/20 text-primary"
+                        <div className={`text-xs font-bold px-3 py-1.5 rounded-full shadow-lg ${
+                          currentStep.operation === "subbytes" ? "bg-orange-500/30 text-orange-300 ring-2 ring-orange-500/50" :
+                          currentStep.operation === "shiftrows" ? "bg-blue-500/30 text-blue-300 ring-2 ring-blue-500/50" :
+                          currentStep.operation === "mixcolumns" ? "bg-purple-500/30 text-purple-300 ring-2 ring-purple-500/50" :
+                          currentStep.operation === "addroundkey" ? "bg-green-500/30 text-green-300 ring-2 ring-green-500/50" :
+                          "bg-primary/30 text-primary ring-2 ring-primary/50"
                         }`}>
-                          {currentStep.operation.toUpperCase()}
+                          {currentStep.operation.toUpperCase().replace(/([A-Z])/g, ' $1').trim()}
                         </div>
                       </div>
-                      <StateMatrix 
-                        state={currentStep.state} 
-                        label="After" 
-                        highlight
-                        colorClass={`border ${
-                          currentStep.operation === "subbytes" ? "bg-orange-500/10 text-orange-400 border-orange-500/50" :
-                          currentStep.operation === "shiftrows" ? "bg-blue-500/10 text-blue-400 border-blue-500/50" :
-                          currentStep.operation === "mixcolumns" ? "bg-purple-500/10 text-purple-400 border-purple-500/50" :
-                          currentStep.operation === "addroundkey" ? "bg-green-500/10 text-green-400 border-green-500/50" :
-                          "bg-primary/10 text-primary border-primary/50"
-                        }`}
-                      />
+                      <div className="animate-in fade-in slide-in-from-right-4 duration-500 delay-100">
+                        <StateMatrix 
+                          state={currentStep.state} 
+                          label="After" 
+                          highlight
+                          colorClass={
+                          currentStep.operation === "subbytes" ? "bg-orange-500/10 text-orange-400 border-orange-500" :
+                          currentStep.operation === "shiftrows" ? "bg-blue-500/10 text-blue-400 border-blue-500" :
+                          currentStep.operation === "mixcolumns" ? "bg-purple-500/10 text-purple-400 border-purple-500" :
+                          currentStep.operation === "addroundkey" ? "bg-green-500/10 text-green-400 border-green-500" :
+                          "bg-primary/10 text-primary border-primary"
+                        }
+                        />
+                      </div>
                     </div>
 
                     <p className="text-xs text-muted-foreground text-center">
