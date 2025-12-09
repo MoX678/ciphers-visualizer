@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import CaesarCipher from "./pages/CaesarCipher";
 import VigenereCipher from "./pages/VigenereCipher";
 import TranspositionCipher from "./pages/TranspositionCipher";
+import RailFenceCipher from "./pages/RailFenceCipher";
 import HillCipher from "./pages/HillCipher";
 import MonoalphabeticCipher from "./pages/MonoalphabeticCipher";
 import PolyalphabeticCipher from "./pages/PolyalphabeticCipher";
@@ -29,6 +30,7 @@ const App = () => (
           <Route path="/caesar" element={<CaesarCipher />} />
           <Route path="/vigenere" element={<VigenereCipher />} />
           <Route path="/transposition" element={<TranspositionCipher />} />
+          <Route path="/railfence" element={<RailFenceCipher />} />
           <Route path="/hill" element={<HillCipher />} />
           <Route path="/monoalphabetic" element={<MonoalphabeticCipher />} />
           <Route path="/polyalphabetic" element={<PolyalphabeticCipher />} />

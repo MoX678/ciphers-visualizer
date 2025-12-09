@@ -73,6 +73,14 @@ const allCiphers = [
     difficulty: "Medium" as const,
     category: "Classical"
   },
+  {
+    title: "Rail Fence Cipher",
+    description: "Transposition cipher that writes text in a zigzag pattern across multiple rails.",
+    icon: <Layers className="w-6 h-6" />,
+    href: "/railfence",
+    difficulty: "Medium" as const,
+    category: "Classical"
+  },
   // Modern Ciphers
   {
     title: "AES Encryption",
@@ -198,7 +206,14 @@ export function ScrollCards() {
   }, []);
 
   const scrollToCiphers = () => {
-    sectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const section = sectionRef.current;
+    if (section) {
+      const offsetTop = section.offsetTop;
+      window.scrollTo({
+        top: offsetTop,
+        behavior: 'smooth'
+      });
+    }
   };
 
   return (
