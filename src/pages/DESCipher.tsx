@@ -499,57 +499,6 @@ function BitBlock({ bits, label, color = "primary" }: { bits: number[]; label: s
   );
 }
 
-function FeistelDiagram({ step }: { step: DESStep }) {
-  if (!step.expanded || !step.xored || !step.sboxOutputs || !step.subkey) return null;
-  
-  return (
-    <div className="bg-muted/30 rounded-lg p-4 space-y-4">
-      <h4 className="font-medium text-purple-400 text-center">Feistel Function Detail</h4>
-      
-      <div className="flex items-center justify-center gap-2 flex-wrap text-xs">
-        <BitBlock bits={step.R} label="R (32 bits)" color="blue" />
-        <span className="text-muted-foreground">→</span>
-        <div className="text-center">
-          <div className="text-xs text-muted-foreground mb-1">Expansion (E)</div>
-          <div className="font-mono text-xs px-2 py-1 rounded bg-orange-500/10 border border-orange-500/50 text-orange-400">
-            {bitsToHex(step.expanded)}
-          </div>
-        </div>
-        <span className="text-muted-foreground">⊕</span>
-        <BitBlock bits={step.subkey} label={`K${step.round}`} color="green" />
-      </div>
-      
-      <div className="flex justify-center">
-        <div className="text-2xl text-purple-400">↓</div>
-      </div>
-      
-      <div className="text-center">
-        <div className="text-xs text-muted-foreground mb-2">S-Box Substitution (8 boxes × 6→4 bits)</div>
-        <div className="flex justify-center gap-1 flex-wrap">
-          {step.sboxOutputs.map((output, i) => (
-            <div key={i} className="text-center">
-              <div className="text-[10px] text-muted-foreground">S{i + 1}</div>
-              <div className="font-mono text-xs px-1 py-0.5 rounded bg-purple-500/20 text-purple-400">
-                {bitsToHex(output)}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      
-      <div className="flex justify-center">
-        <div className="text-2xl text-purple-400">↓</div>
-      </div>
-      
-      <div className="text-center">
-        <div className="text-xs text-muted-foreground mb-1">P-Box Permutation → f(R, K)</div>
-        <div className="font-mono text-sm px-3 py-1 rounded bg-purple-500/20 border border-purple-500/50 text-purple-400 inline-block">
-          {step.feistelOutput ? bitsToHex(step.feistelOutput) : ""}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function DESCipher() {
   const [inputText, setInputText] = useState(() => {
@@ -1215,7 +1164,6 @@ export default function DESCipher() {
                   <h4 className="text-sm font-medium text-green-400 text-center mb-4">Final Ciphertext Output</h4>
                   <div className="space-y-4">
                     <div className="text-center">
-                      <div className="text-sm font-medium text-green-400 mb-2">Complete Ciphertext (64 bits)</div>
                       <div className="px-6 py-4 bg-green-500/10 border-2 border-green-500/50 rounded">
                         <div className="font-mono text-xl text-green-300 font-bold break-all">
                           {bitsToHex([...currentStep.L, ...currentStep.R])}
