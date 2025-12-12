@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { CipherLayout } from "@/components/CipherLayout";
-import { LetterBox } from "@/components/LetterBox";
 import { ModeToggle } from "@/components/ModeToggle";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -304,7 +303,7 @@ export default function PolyalphabeticCipher() {
               />
             </div>
 
-            {/* Shift Rules */}
+            {/* Shift Rules - Tape Design */}
             <div className="glass-card p-5 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-foreground">Shift Rules (Key)</h3>
@@ -319,23 +318,63 @@ export default function PolyalphabeticCipher() {
                 </Button>
               </div>
               
-              <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                {rules.map((rule, index) => {
+              {/* Rules Tape Visualization - Monochrome, highlights on active */}
+              <div className="flex items-center gap-0 flex-wrap">
+                {rules.map((rule, index, arr) => {
                   const color = getRuleColor(index);
+                  const isActive = calculation && calculation.ruleIndex === index;
                   return (
                     <div 
                       key={index}
-                      className={cn("flex items-center gap-2 p-2 rounded-lg", color.bg, "border", color.border)}
+                      className={cn(
+                        "flex items-center border-y transition-all",
+                        index === 0 && "border-l rounded-l-md",
+                        index === arr.length - 1 && "border-r rounded-r-md",
+                        index !== 0 && index !== arr.length - 1 && "border-l-0 border-r-0",
+                        isActive ? cn(color.border, "bg-gradient-to-b", color.bg.replace("bg-", "from-"), "to-transparent") : "border-border bg-muted/20"
+                      )}
                     >
-                      <div className={cn("font-bold text-xs w-12", color.text)}>
+                      <div className={cn(
+                        "px-2 py-1 text-[10px] font-bold border-r",
+                        isActive ? cn(color.text, color.border) : "text-muted-foreground border-border"
+                      )}>
+                        R{rule.position}
+                      </div>
+                      <div className={cn(
+                        "w-8 h-7 flex items-center justify-center font-mono text-sm font-bold",
+                        isActive ? color.text : "text-foreground"
+                      )}>
+                        +{rule.shift}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {/* Detailed Rule Editor - Always Colored */}
+              <div className="space-y-1.5 pt-2 border-t border-border/50">
+                {rules.map((rule, index) => {
+                  const color = getRuleColor(index);
+                  const isActive = calculation && calculation.ruleIndex === index;
+                  return (
+                    <div 
+                      key={index}
+                      className={cn(
+                        "flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-all",
+                        color.bg, color.border,
+                        isActive && "ring-1 ring-offset-1 ring-offset-background",
+                        isActive && color.border.replace("border-", "ring-")
+                      )}
+                    >
+                      <div className={cn("font-bold text-xs w-8", color.text)}>
                         R{rule.position}:
                       </div>
-                      <div className="flex-1 flex items-center gap-2">
+                      <div className="flex-1 flex items-center gap-1.5">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => updateShift(index, rule.shift - 1)}
-                          className="h-6 w-6 p-0"
+                          className="h-5 w-5 p-0"
                         >
                           <Minus className="w-3 h-3" />
                         </Button>
@@ -344,7 +383,7 @@ export default function PolyalphabeticCipher() {
                           value={rule.shift}
                           onChange={(e) => updateShift(index, parseInt(e.target.value) || 0)}
                           className={cn(
-                            "w-10 h-7 bg-background/50 border rounded text-center font-mono text-sm",
+                            "w-8 h-6 bg-background/50 border rounded text-center font-mono text-xs",
                             color.border, color.text
                           )}
                           min={0}
@@ -354,12 +393,12 @@ export default function PolyalphabeticCipher() {
                           variant="ghost"
                           size="sm"
                           onClick={() => updateShift(index, rule.shift + 1)}
-                          className="h-6 w-6 p-0"
+                          className="h-5 w-5 p-0"
                         >
                           <Plus className="w-3 h-3" />
                         </Button>
-                        <span className="text-muted-foreground text-xs">
-                          shift {mode === "encrypt" ? "right" : "left"}
+                        <span className="text-muted-foreground text-[10px]">
+                          shift {mode === "encrypt" ? "→" : "←"}
                         </span>
                       </div>
                       {rules.length > 1 && (
@@ -367,7 +406,7 @@ export default function PolyalphabeticCipher() {
                           variant="ghost"
                           size="sm"
                           onClick={() => removeRule(index)}
-                          className="text-muted-foreground hover:text-destructive h-6 w-6 p-0"
+                          className="text-muted-foreground hover:text-destructive h-5 w-5 p-0"
                         >
                           <Minus className="w-3 h-3" />
                         </Button>
@@ -479,84 +518,122 @@ export default function PolyalphabeticCipher() {
               </div>
             )}
             
-            {/* Input letters - clickable */}
-            <div>
-              <p className="text-xs text-muted-foreground mb-2">
-                {mode === "encrypt" ? "Plaintext" : "Ciphertext"} - Click to navigate
-              </p>
-              <div className="flex flex-wrap gap-1">
-                {cleanInput.split("").map((letter, i) => {
-                  const ruleIndex = i % rules.length;
-                  const color = getRuleColor(ruleIndex);
-                  const isActive = i === activeIndex;
-                  const isProcessed = i <= activeIndex && activeIndex >= 0;
-                  
-                  return (
-                    <button 
-                      key={`input-${i}`} 
-                      onClick={() => !isAnimating && goToStep(i)}
-                      disabled={isAnimating}
-                      className={cn(
-                        "flex flex-col items-center cursor-pointer transition-all hover:bg-muted/30 rounded p-1",
-                        "disabled:cursor-not-allowed",
-                        isActive && "bg-primary/20 ring-1 ring-primary",
-                        isProcessed && !isActive && "bg-muted/30"
-                      )}
-                    >
-                      <div className={cn(
-                        "w-9 h-9 rounded-lg flex items-center justify-center font-mono text-lg border-2 transition-all",
-                        isActive && "bg-blue-500/30 border-blue-500 text-blue-400 scale-105",
-                        isProcessed && !isActive && "bg-muted/50 border-muted-foreground/50 text-muted-foreground",
-                        !isProcessed && "border-border text-foreground"
-                      )}>
-                        {letter}
-                      </div>
-                      <div className={cn("text-[9px] mt-0.5", color.text)}>
-                        R{ruleIndex + 1}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Output letters - clickable */}
-            {hasAnimated && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-2">
-                  {mode === "encrypt" ? "Ciphertext" : "Plaintext"}
-                </p>
-                <div className="flex flex-wrap gap-1">
-                  {outputText.split("").map((letter, i) => {
+            {/* Tape Visualization - Vigenère Style */}
+            <div className="space-y-2 py-2">
+              {/* Input Tape */}
+              <div className="flex items-center gap-3">
+                <div className="w-14 text-right text-xs text-blue-400 font-semibold uppercase tracking-wide shrink-0">
+                  {mode === "encrypt" ? "Plain" : "Cipher"}
+                </div>
+                <div className="flex gap-0.5 flex-wrap">
+                  {cleanInput.split("").map((letter, i) => {
                     const ruleIndex = i % rules.length;
-                    const color = getRuleColor(ruleIndex);
-                    const isCurrentStep = i === activeIndex;
+                    const isActive = i === activeIndex;
+                    const isProcessed = i <= activeIndex && hasAnimated;
                     
                     return (
                       <button 
-                        key={`output-${i}`}
-                        onClick={() => goToStep(i)}
+                        key={`input-${i}`} 
+                        onClick={() => !isAnimating && goToStep(i)}
+                        disabled={isAnimating}
                         className={cn(
-                          "flex flex-col items-center cursor-pointer transition-all hover:bg-muted/30 rounded p-1",
-                          isCurrentStep && "bg-green-500/20 ring-1 ring-green-500"
+                          "w-10 h-12 flex flex-col items-center justify-center rounded-lg transition-all duration-300",
+                          "bg-gradient-to-b from-blue-500/30 to-blue-500/10 border border-blue-500/40",
+                          "hover:from-blue-500/40 hover:to-blue-500/20 cursor-pointer disabled:cursor-default",
+                          isActive && isAnimating && "ring-2 ring-blue-400 scale-105 shadow-lg shadow-blue-500/20",
+                          isProcessed && !isActive && "opacity-60"
                         )}
                       >
-                        <div className={cn(
-                          "w-9 h-9 rounded-lg flex items-center justify-center font-mono text-lg border-2 transition-all",
-                          "bg-green-500/20 border-green-500/50 text-green-400",
-                          isCurrentStep && "border-green-500 scale-105"
-                        )}>
-                          {letter}
-                        </div>
-                        <div className={cn("text-[9px] mt-0.5", color.text)}>
+                        <span className={cn(
+                          "font-mono font-bold text-lg",
+                          isActive && isAnimating ? "text-blue-300" : "text-blue-400"
+                        )}>{letter}</span>
+                        <span className={cn("text-[8px] font-semibold", getRuleColor(ruleIndex).text)}>
                           R{ruleIndex + 1}
-                        </div>
+                        </span>
                       </button>
                     );
                   })}
                 </div>
               </div>
-            )}
+
+              {/* Operation Line */}
+              <div className="flex items-center gap-3">
+                <div className="w-14" />
+                <div className="flex gap-0.5 flex-wrap">
+                  {cleanInput.split("").map((_, i) => {
+                    const ruleIndex = i % rules.length;
+                    const shift = rules[ruleIndex].shift;
+                    const isActive = i === activeIndex && isAnimating;
+                    const isProcessed = i < activeIndex && hasAnimated;
+                    
+                    return (
+                      <div key={`op-${i}`} className="w-10 flex items-center justify-center">
+                        <span className={cn(
+                          "text-xs font-bold transition-all duration-300",
+                          isActive
+                            ? cn("scale-125", getRuleColor(ruleIndex).text)
+                            : isProcessed
+                              ? "text-muted-foreground/50"
+                              : "text-muted-foreground/30"
+                        )}>{mode === "encrypt" ? "+" : "−"}{shift}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Equals Line */}
+              <div className="flex items-center gap-3">
+                <div className="w-14" />
+                <div className="flex gap-0.5 flex-wrap">
+                  {cleanInput.split("").map((_, i) => (
+                    <div key={`eq-${i}`} className="w-10 flex items-center justify-center">
+                      <div className={cn(
+                        "w-5 h-0.5 transition-all duration-300",
+                        hasAnimated && i <= activeIndex ? "bg-primary" : "bg-muted-foreground/20"
+                      )} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Output Tape */}
+              <div className="flex items-center gap-3">
+                <div className="w-14 text-right text-xs text-primary font-semibold uppercase tracking-wide shrink-0">
+                  {mode === "encrypt" ? "Cipher" : "Plain"}
+                </div>
+                <div className="flex gap-0.5 flex-wrap">
+                  {cleanInput.split("").map((_, i) => {
+                    const ruleIndex = i % rules.length;
+                    const isActive = i === activeIndex;
+                    const showOutput = hasAnimated && (isAnimating ? i < activeIndex : i <= activeIndex);
+                    const outputChar = showOutput ? outputText[i] || "" : "";
+                    
+                    return (
+                      <div 
+                        key={`output-${i}`}
+                        className={cn(
+                          "w-10 h-12 flex flex-col items-center justify-center rounded-lg transition-all duration-300",
+                          "bg-gradient-to-b from-primary/30 to-primary/10 border border-primary/40",
+                          isActive && isAnimating && "ring-2 ring-primary scale-105 shadow-lg shadow-primary/20"
+                        )}
+                      >
+                        <span className={cn(
+                          "font-mono font-bold text-lg",
+                          isActive && isAnimating ? "text-primary/80" : "text-primary"
+                        )}>{outputChar}</span>
+                        {showOutput && (
+                          <span className={cn("text-[8px] font-semibold", getRuleColor(ruleIndex).text)}>
+                            R{ruleIndex + 1}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
 
             {/* Step navigation buttons */}
             {hasAnimated && !isAnimating && (
@@ -585,84 +662,124 @@ export default function PolyalphabeticCipher() {
               </div>
             )}
 
-            {/* Current Step Calculation - Integrated */}
+            {/* Current Step Detail - Enhanced */}
             {calculation && (
-              <div className="pt-4 border-t border-border space-y-4">
-                <h4 className="text-sm font-semibold text-primary">
-                  Step {activeIndex + 1}: Letter "{calculation.textChar}" → "{calculation.result}" (Rule {calculation.rulePosition})
-                </h4>
-                
-                {/* Scaled up 4-column grid */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="pt-3 border-t border-border/50 space-y-4">
+                {/* Step Header */}
+                <div className="text-center">
+                  <span className={cn(
+                    "text-sm font-medium",
+                    getRuleColor(calculation.ruleIndex).text
+                  )}>
+                    Processing Letter {activeIndex + 1}: Using Rule {calculation.rulePosition}
+                  </span>
+                </div>
+
+                {/* 4-Column Detail Grid */}
+                <div className="grid grid-cols-4 gap-2">
                   {/* Input Letter */}
-                  <div className="bg-blue-500/10 rounded-lg p-4 text-center border border-blue-500/30">
-                    <div className="text-sm text-muted-foreground mb-2">
-                      {mode === "encrypt" ? "Plain" : "Cipher"}
+                  <div className="bg-muted/20 rounded-lg p-3 text-center">
+                    <div className="text-[10px] text-muted-foreground mb-1.5">
+                      {mode === "encrypt" ? "Plaintext" : "Ciphertext"}
                     </div>
-                    <div className="w-14 h-14 mx-auto rounded-lg bg-blue-500/20 border-2 border-blue-500 flex items-center justify-center text-2xl font-bold text-blue-400">
+                    <div className="w-10 h-10 mx-auto rounded-lg bg-gradient-to-b from-blue-500/30 to-blue-500/10 border border-blue-500/50 flex items-center justify-center text-xl font-bold text-blue-400">
                       {calculation.textChar}
                     </div>
-                    <div className="text-sm text-muted-foreground mt-2">
-                      index: <span className="text-blue-400 font-mono text-base">{calculation.textIndex}</span>
+                    <div className="text-[10px] text-muted-foreground mt-1.5">
+                      Index: <span className="text-blue-400 font-mono">{calculation.textIndex}</span>
                     </div>
                   </div>
 
                   {/* Shift Amount */}
-                  <div className={cn("rounded-lg p-4 text-center border", getRuleColor(calculation.ruleIndex).bg, getRuleColor(calculation.ruleIndex).border)}>
-                    <div className="text-sm text-muted-foreground mb-2">
-                      R{calculation.rulePosition} Shift
+                  <div className={cn(
+                    "rounded-lg p-3 text-center border",
+                    getRuleColor(calculation.ruleIndex).bg,
+                    getRuleColor(calculation.ruleIndex).border
+                  )}>
+                    <div className="text-[10px] text-muted-foreground mb-1.5">
+                      Rule {calculation.rulePosition} Shift
                     </div>
                     <div className={cn(
-                      "w-14 h-14 mx-auto rounded-lg bg-background/50 border-2 flex items-center justify-center text-2xl font-bold",
-                      getRuleColor(calculation.ruleIndex).border, getRuleColor(calculation.ruleIndex).text
+                      "w-10 h-10 mx-auto rounded-lg bg-background/50 border flex items-center justify-center text-xl font-bold",
+                      getRuleColor(calculation.ruleIndex).border,
+                      getRuleColor(calculation.ruleIndex).text
                     )}>
-                      {mode === "encrypt" ? "+" : "-"}{calculation.shift}
+                      {mode === "encrypt" ? "+" : "−"}{calculation.shift}
                     </div>
-                    <div className="text-sm text-muted-foreground mt-2">
-                      {mode === "encrypt" ? "right" : "left"}
+                    <div className="text-[10px] text-muted-foreground mt-1.5">
+                      {mode === "encrypt" ? "Right" : "Left"} shift
                     </div>
                   </div>
 
                   {/* Operation */}
-                  <div className="bg-muted/20 rounded-lg p-4 text-center flex flex-col justify-center">
-                    <div className="font-mono text-sm text-foreground">
-                      ({calculation.textIndex} {mode === "encrypt" ? "+" : "-"} {calculation.shift}) mod 26
+                  <div className="bg-muted/20 rounded-lg p-3 text-center flex flex-col justify-center">
+                    <div className="text-[10px] text-muted-foreground mb-1">Operation</div>
+                    <div className="font-mono text-xs text-foreground">
+                      ({calculation.textIndex} {mode === "encrypt" ? "+" : "−"} {calculation.shift}) mod 26
                     </div>
-                    <div className="text-2xl text-primary my-1">=</div>
-                    <div className="font-mono text-2xl text-primary">{calculation.resultIndex}</div>
+                    <div className="text-lg text-primary my-0.5">=</div>
+                    <div className="font-mono text-base text-primary font-bold">{calculation.resultIndex}</div>
                   </div>
 
                   {/* Result Letter */}
-                  <div className="bg-green-500/10 rounded-lg p-4 text-center border border-green-500/30">
-                    <div className="text-sm text-muted-foreground mb-2">
-                      {mode === "encrypt" ? "Cipher" : "Plain"}
+                  <div className="bg-muted/20 rounded-lg p-3 text-center">
+                    <div className="text-[10px] text-muted-foreground mb-1.5">
+                      {mode === "encrypt" ? "Ciphertext" : "Plaintext"}
                     </div>
-                    <div className="w-14 h-14 mx-auto rounded-lg bg-green-500/20 border-2 border-green-500 flex items-center justify-center text-2xl font-bold text-green-400">
+                    <div className="w-10 h-10 mx-auto rounded-lg bg-gradient-to-b from-primary/30 to-primary/10 border border-primary/50 flex items-center justify-center text-xl font-bold text-primary">
                       {calculation.result}
                     </div>
-                    <div className="text-sm text-muted-foreground mt-2">
-                      index: <span className="text-green-400 font-mono text-base">{calculation.resultIndex}</span>
+                    <div className="text-[10px] text-muted-foreground mt-1.5">
+                      Index: <span className="text-primary font-mono">{calculation.resultIndex}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Visual shift on alphabet */}
-                <div className="p-3 bg-muted/20 rounded-lg">
-                  <div className="flex justify-center">
-                    <div className="flex gap-0.5 overflow-x-auto pb-2">
-                      {ALPHABET.split("").map((letter, i) => {
+                {/* Step Equation Summary */}
+                <div className="flex items-center justify-center">
+                  <div className={cn(
+                    "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/50",
+                    "bg-gradient-to-r from-blue-500/10 via-transparent to-primary/10"
+                  )}>
+                    <div className="flex items-center gap-1.5 font-mono text-sm">
+                      <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 font-bold">
+                        {calculation.textChar}
+                      </span>
+                      <span className="text-muted-foreground text-[10px]">({calculation.textIndex})</span>
+                      <span className={cn("font-bold", getRuleColor(calculation.ruleIndex).text)}>
+                        {mode === "encrypt" ? "+" : "−"}
+                      </span>
+                      <span className={cn("px-1.5 py-0.5 rounded font-bold", getRuleColor(calculation.ruleIndex).bg, getRuleColor(calculation.ruleIndex).text)}>
+                        {calculation.shift}
+                      </span>
+                      <span className="text-primary">=</span>
+                      <span className="px-1.5 py-0.5 rounded bg-primary/20 text-primary font-bold">
+                        {calculation.result}
+                      </span>
+                      <span className="text-muted-foreground text-[10px]">({calculation.resultIndex})</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Alphabet Shift Visualization */}
+                <div className="p-3 bg-muted/10 rounded-lg">
+                  <div className="text-[10px] text-muted-foreground mb-2 text-center">Alphabet Shift Visualization</div>
+                  <div className="flex justify-center overflow-x-auto pb-1">
+                    <div className="flex gap-0">
+                      {ALPHABET.split("").map((letter, i, arr) => {
                         const isSource = i === calculation.textIndex;
                         const isTarget = i === calculation.resultIndex;
                         return (
                           <div
                             key={letter}
                             className={cn(
-                              "w-7 h-7 flex items-center justify-center text-xs font-mono rounded transition-all",
-                              isSource
-                                ? "bg-blue-500 text-white scale-110 ring-2 ring-blue-300"
-                                : isTarget
-                                ? "bg-green-500 text-white scale-110 ring-2 ring-green-300"
-                                : "bg-muted/50 text-muted-foreground"
+                              "w-6 h-6 flex items-center justify-center text-[10px] font-mono border-y transition-all",
+                              i === 0 && "border-l rounded-l",
+                              i === arr.length - 1 && "border-r rounded-r",
+                              i !== 0 && i !== arr.length - 1 && "border-l-0 border-r-0",
+                              isSource && "bg-blue-500 text-white scale-110 z-10 border-blue-500 rounded shadow-lg shadow-blue-500/30",
+                              isTarget && "bg-primary text-primary-foreground scale-110 z-10 border-primary rounded shadow-lg shadow-primary/30",
+                              !isSource && !isTarget && "bg-muted/30 text-muted-foreground/70 border-border/50"
                             )}
                           >
                             {letter}
@@ -671,11 +788,17 @@ export default function PolyalphabeticCipher() {
                       })}
                     </div>
                   </div>
-                  <div className="flex justify-center mt-2 text-sm gap-4">
-                    <span className="text-blue-400">● {calculation.textChar}</span>
-                    <span className="text-green-400">● {calculation.result}</span>
-                    <span className={getRuleColor(calculation.ruleIndex).text}>
-                      ({calculation.shift} {mode === "encrypt" ? "right" : "left"})
+                  <div className="flex justify-center mt-2 gap-4 text-[10px]">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                      <span className="text-blue-400">Source: {calculation.textChar}</span>
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-primary"></span>
+                      <span className="text-primary">Result: {calculation.result}</span>
+                    </span>
+                    <span className={cn("flex items-center gap-1", getRuleColor(calculation.ruleIndex).text)}>
+                      (shifted {calculation.shift} {mode === "encrypt" ? "right" : "left"})
                     </span>
                   </div>
                 </div>

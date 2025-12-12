@@ -570,11 +570,11 @@ export default function PlayfairCipher() {
               </div>
             )}
 
-            {/* Input and Output pairs side by side */}
+            {/* Input and Output pairs side by side - Tape Design */}
             <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
               {/* Input Digraphs */}
               <div>
-                <p className="text-xs text-muted-foreground mb-1.5">Input Pairs</p>
+                <p className="text-xs text-blue-400/70 mb-1.5 font-medium">Input Pairs</p>
                 <div className="flex flex-wrap gap-1">
                   {pairs.map((pair, i) => {
                     const isActive = i === activeStep;
@@ -586,14 +586,26 @@ export default function PlayfairCipher() {
                         onClick={() => !isAnimating && goToStep(i)}
                         disabled={isAnimating}
                         className={cn(
-                          "px-2 py-1 rounded border font-mono text-xs transition-all cursor-pointer",
-                          "hover:bg-muted/30 disabled:cursor-not-allowed",
-                          isActive && "bg-primary/20 border-primary text-primary ring-1 ring-primary",
-                          isProcessed && !isActive && "bg-muted/50 border-muted-foreground/30 text-muted-foreground",
-                          !isProcessed && "border-border text-foreground"
+                          "flex gap-px font-mono text-xs transition-all cursor-pointer",
+                          "hover:scale-105 disabled:cursor-not-allowed disabled:hover:scale-100"
                         )}
                       >
-                        {pair}
+                        <div className={cn(
+                          "w-6 h-7 flex items-center justify-center border rounded-l transition-all",
+                          isActive && "bg-gradient-to-b from-blue-500/40 to-blue-500/20 border-blue-500 text-blue-400 ring-1 ring-blue-500",
+                          isProcessed && !isActive && "bg-gradient-to-b from-blue-500/20 to-blue-500/10 border-blue-500/40 text-blue-400/70",
+                          !isProcessed && "bg-gradient-to-b from-blue-500/15 to-blue-500/5 border-blue-500/30 text-foreground/70"
+                        )}>
+                          {pair[0]}
+                        </div>
+                        <div className={cn(
+                          "w-6 h-7 flex items-center justify-center border border-l-0 rounded-r transition-all",
+                          isActive && "bg-gradient-to-b from-blue-500/40 to-blue-500/20 border-blue-500 text-blue-400 ring-1 ring-blue-500",
+                          isProcessed && !isActive && "bg-gradient-to-b from-blue-500/20 to-blue-500/10 border-blue-500/40 text-blue-400/70",
+                          !isProcessed && "bg-gradient-to-b from-blue-500/15 to-blue-500/5 border-blue-500/30 text-foreground/70"
+                        )}>
+                          {pair[1]}
+                        </div>
                       </button>
                     );
                   })}
@@ -602,13 +614,13 @@ export default function PlayfairCipher() {
               
               {/* Output Pairs */}
               <div>
-                <p className="text-xs text-muted-foreground mb-1.5">Output Pairs</p>
+                <p className="text-xs text-primary/70 mb-1.5 font-medium">Output Pairs</p>
                 <div className="flex flex-wrap gap-1">
                   {hasAnimated && outputText.length > 0 ? (
                     Array.from({ length: Math.ceil(outputText.length / 2) }).map((_, i) => {
                       const idx = i * 2;
                       const pair = outputText.slice(idx, idx + 2);
-                      if (!pair) return null;
+                      if (!pair || pair.length < 2) return null;
                       
                       const isCurrentStep = i === activeStep;
                       
@@ -617,12 +629,26 @@ export default function PlayfairCipher() {
                           key={i}
                           onClick={() => goToStep(i)}
                           className={cn(
-                            "px-2 py-1 rounded border font-mono text-xs transition-all cursor-pointer",
-                            "hover:bg-muted/30 text-green-400 border-green-500/50",
-                            isCurrentStep && "bg-green-500/20 ring-1 ring-green-500"
+                            "flex gap-px font-mono text-xs transition-all cursor-pointer",
+                            "hover:scale-105"
                           )}
                         >
-                          {pair}
+                          <div className={cn(
+                            "w-6 h-7 flex items-center justify-center border rounded-l transition-all",
+                            isCurrentStep 
+                              ? "bg-gradient-to-b from-primary/40 to-primary/20 border-primary text-primary ring-1 ring-primary"
+                              : "bg-gradient-to-b from-primary/25 to-primary/10 border-primary/50 text-primary"
+                          )}>
+                            {pair[0]}
+                          </div>
+                          <div className={cn(
+                            "w-6 h-7 flex items-center justify-center border border-l-0 rounded-r transition-all",
+                            isCurrentStep 
+                              ? "bg-gradient-to-b from-primary/40 to-primary/20 border-primary text-primary ring-1 ring-primary"
+                              : "bg-gradient-to-b from-primary/25 to-primary/10 border-primary/50 text-primary"
+                          )}>
+                            {pair[1]}
+                          </div>
                         </button>
                       );
                     })
@@ -669,8 +695,8 @@ export default function PlayfairCipher() {
                   <h4 className="text-sm font-semibold text-primary">
                     Step {activeStep + 1}: "{pairs[activeStep]}" → "{processFunction(matrix, pairs[activeStep]).result}"
                   </h4>
-                  <div className={cn("px-2 py-0.5 rounded text-xs", getRuleColor(currentRule.type))}>
-                    {currentRule.type.toUpperCase()}
+                  <div className={cn("px-2 py-0.5 rounded text-xs border", getRuleColor(currentRule.type))}>
+                    {currentRule.type.charAt(0).toUpperCase() + currentRule.type.slice(1)} Rule
                   </div>
                 </div>
                 
@@ -694,7 +720,7 @@ export default function PlayfairCipher() {
                   
                   {/* Output */}
                   <div className="text-center">
-                    <div className="font-mono text-2xl text-green-400">
+                    <div className="font-mono text-2xl text-primary">
                       {processFunction(matrix, pairs[activeStep]).result}
                     </div>
                     <div className="text-xs text-muted-foreground">

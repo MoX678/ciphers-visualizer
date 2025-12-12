@@ -1262,40 +1262,74 @@ export default function DESCipher() {
             {/* Initial Input Visualization */}
             {currentStep && currentStep.type === "initial" && (
               <div className="pt-3 border-t border-border animate-in fade-in duration-500">
-                <h4 className="text-sm font-bold text-purple-400 text-center mb-3 uppercase tracking-wider">Block Division - Initial Input</h4>
-                <div className="bg-gradient-to-br from-muted/15 to-muted/5 rounded-xl p-6 border-2 border-border shadow-lg">
-                  <div className="space-y-6">
-                    
-                    {/* Block Info */}
-                    {currentStep.blockInfo && (
-                      <div className="text-center animate-in zoom-in duration-300">
-                        <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-yellow-500/20 to-yellow-500/10 border-2 border-yellow-500/60 rounded-lg shadow-md ring-2 ring-yellow-500/20">
-                          <svg className="w-5 h-5 text-yellow-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          <span className="text-sm font-bold text-yellow-400">
-                            Processing Block {currentStep.blockInfo.currentBlock + 1} of {currentStep.blockInfo.totalBlocks}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 64-bit Input Block */}
-                    <div className="text-center animate-in slide-in-from-top duration-500 delay-100">
-                      <div className="text-xs text-muted-foreground mb-2 font-bold">64-Bit Input Block (Original Plaintext)</div>
-                      <div className="px-6 py-4 bg-gradient-to-br from-purple-500/20 to-purple-500/10 border-2 border-purple-500/60 rounded-lg shadow-lg ring-2 ring-purple-500/20">
-                        <div className="font-mono text-xl text-purple-300 font-bold break-all">
-                          {bitsToHex([...currentStep.L, ...currentStep.R])}
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-2 font-medium">16 hex characters (64 bits)</div>
+                <h4 className="text-sm font-bold text-purple-400 text-center mb-3 uppercase tracking-wider">Block Division</h4>
+                <div className="bg-gradient-to-br from-muted/15 to-muted/5 rounded-xl p-4 border-2 border-border shadow-lg">
+                  
+                  {/* Block Progress */}
+                  {currentStep.blockInfo && (
+                    <div className="mb-4">
+                      <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500/20 to-yellow-500/10 border-2 border-yellow-500/60 rounded-lg">
+                        <svg className="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-sm font-semibold text-yellow-400">
+                          Block {currentStep.blockInfo.currentBlock + 1} of {currentStep.blockInfo.totalBlocks}
+                        </span>
                       </div>
                     </div>
+                  )}
 
-                    {/* Explanation */}
-                    <div className="text-center text-xs text-muted-foreground pt-3 border-t border-border">
-                      The plaintext is converted to a 64-bit block and will be processed through Initial Permutation (IP) in the next step.
+                  {/* Blocks Grid */}
+                  {currentStep.blockInfo && currentStep.blockInfo.blocks && (
+                    <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(currentStep.blockInfo.blocks.length, 4)}, 1fr)` }}>
+                      {currentStep.blockInfo.blocks.map((block, idx) => {
+                        const isActive = idx === currentStep.blockInfo?.currentBlock;
+                        const isCompleted = idx < (currentStep.blockInfo?.currentBlock || 0);
+                        
+                        return (
+                          <div
+                            key={idx}
+                            className={`relative rounded-lg p-3 border-2 transition-all duration-300 ${
+                              isActive
+                                ? 'bg-gradient-to-br from-yellow-500/20 to-orange-500/10 border-yellow-500/60 shadow-lg'
+                                : isCompleted
+                                ? 'bg-gradient-to-br from-green-500/10 to-emerald-500/5 border-green-400/40'
+                                : 'bg-muted/20 border-border'
+                            }`}
+                          >
+                            {/* Status badge */}
+                            <div className={`absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                              isActive
+                                ? 'bg-yellow-400 text-black'
+                                : isCompleted
+                                ? 'bg-green-400 text-black'
+                                : 'bg-muted border border-border text-muted-foreground'
+                            }`}>
+                              {isCompleted ? '✓' : idx + 1}
+                            </div>
+
+                            {/* Hex display */}
+                            <div className={`font-mono text-xs font-semibold text-center px-2 py-1.5 rounded border ${
+                              isActive
+                                ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-200'
+                                : isCompleted
+                                ? 'bg-green-500/10 border-green-500/30 text-green-300'
+                                : 'bg-muted/30 border-border text-foreground'
+                            }`}>
+                              {block.split('').map((char, i) => 
+                                char.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase()
+                              ).join('')}
+                            </div>
+
+                            {/* Size */}
+                            <div className="text-center mt-1.5">
+                              <span className="text-[9px] text-muted-foreground">64 bits</span>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1407,149 +1441,203 @@ export default function DESCipher() {
               </div>
             )}
 
-            {/* DES Feistel Network Visualization - Enhanced Design */}
+            {/* DES Feistel Network Visualization - App Design */}
             {currentStep?.type === "round" && currentStep.expanded && (
               <div className="pt-3 border-t border-border animate-in fade-in duration-500">
-                <h4 className="text-sm font-bold text-purple-400 text-center mb-3 uppercase tracking-wider">Round {currentStep.round} - Feistel Network</h4>
-                <div className="bg-gradient-to-br from-muted/15 to-muted/5 rounded-xl p-8 border-2 border-border shadow-lg">
-                  <div className="flex justify-center">
-                    <div className="relative" style={{ width: '560px', height: '620px' }}>
+                <h4 className="text-sm font-bold text-purple-400 text-center mb-4 uppercase tracking-wider">Round {currentStep.round} - Feistel Network</h4>
+                
+                <div className="relative border border-border/50 rounded-xl p-6 bg-gradient-to-br from-muted/10 to-transparent">
+                  
+                  {/* Input Label */}
+                  <div className="absolute left-4 text-sm text-muted-foreground font-medium" style={{ top: '28px' }}>Input</div>
+                  
+                  {/* Round Label */}
+                  <div className="absolute left-4 text-sm text-muted-foreground font-medium" style={{ bottom: '28px' }}>Round {currentStep.round}</div>
+
+                  {/* Main Diagram Container */}
+                  <div className="ml-16 mr-4">
+                    
+                    {/* Top Row - L0 | R0 with values */}
+                    <div className="flex">
+                      <div className="flex-1 h-14 bg-gradient-to-r from-blue-500/25 to-blue-500/15 border-2 border-blue-500/50 flex flex-col items-center justify-center">
+                        <span className="text-blue-400/70 text-xs font-semibold">L<sub>{currentStep.round - 1}</sub></span>
+                        <span className="text-blue-400 font-mono font-bold text-sm">
+                          {(() => {
+                            const prevRound = steps.find(s => s.type === "round" && s.round === currentStep.round - 1);
+                            return prevRound ? bitsToHex(prevRound.L) : bitsToHex(currentStep.L);
+                          })()}
+                        </span>
+                      </div>
+                      <div className="flex-1 h-14 bg-gradient-to-r from-orange-500/25 to-orange-500/15 border-2 border-orange-500/50 border-l-0 flex flex-col items-center justify-center">
+                        <span className="text-orange-400/70 text-xs font-semibold">R<sub>{currentStep.round - 1}</sub></span>
+                        <span className="text-orange-400 font-mono font-bold text-sm">
+                          {(() => {
+                            const prevRound = steps.find(s => s.type === "round" && s.round === currentStep.round - 1);
+                            return prevRound ? bitsToHex(prevRound.R) : bitsToHex(currentStep.R);
+                          })()}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Middle Section with connections */}
+                    <div className="relative" style={{ height: '220px' }}>
                       
-                      {/* Top Input L and R boxes - Enhanced styling */}
-                      <div className="absolute top-0 left-8 animate-in fade-in slide-in-from-left duration-500">
-                        <div className="px-6 py-3 bg-gradient-to-br from-blue-500/20 to-blue-500/10 border-2 border-blue-500/60 rounded-lg text-blue-400 font-mono text-lg font-bold shadow-lg ring-2 ring-blue-500/20">
+                      {/* Connection lines - proper Feistel structure */}
+                      <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 400 220" preserveAspectRatio="none">
+                        {/* L path: straight down, then horizontal to XOR */}
+                        <path d="M 100 0 L 100 100 L 150 100" stroke="rgba(59, 130, 246, 0.6)" strokeWidth="2.5" fill="none" />
+                        
+                        {/* From XOR output to R4 (goes right then down) */}
+                        <path d="M 190 100 L 300 100 L 300 220" stroke="rgba(251, 146, 60, 0.6)" strokeWidth="2.5" fill="none" />
+                        
+                        {/* R path: down to f-box */}
+                        <path d="M 300 0 L 300 45" stroke="rgba(251, 146, 60, 0.6)" strokeWidth="2.5" fill="none" />
+                        
+                        {/* f-box output horizontal to XOR */}
+                        <path d="M 260 75 L 170 100" stroke="rgba(168, 85, 247, 0.7)" strokeWidth="2.5" fill="none" />
+                        
+                        {/* R continues down (SWAP - becomes L4) */}
+                        <path d="M 300 95 L 300 160" stroke="rgba(148, 163, 184, 0.4)" strokeWidth="2" strokeDasharray="6 4" fill="none" />
+                        <path d="M 300 160 L 100 220" stroke="rgba(59, 130, 246, 0.5)" strokeWidth="2.5" fill="none" />
+                        
+                        {/* Key arrow pointing to f-box */}
+                        <path d="M 370 70 L 340 70" stroke="rgba(74, 222, 128, 0.7)" strokeWidth="2" fill="none" markerEnd="url(#arrowhead)" />
+                        
+                        {/* Arrowhead marker */}
+                        <defs>
+                          <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                            <polygon points="0 0, 6 3, 0 6" fill="rgba(74, 222, 128, 0.7)" />
+                          </marker>
+                        </defs>
+                      </svg>
+
+                      {/* XOR Circle */}
+                      <div className="absolute z-10" style={{ left: '42%', top: '82px', transform: 'translateX(-50%)' }}>
+                        <div className="w-10 h-10 rounded-full border-2 border-blue-400/60 bg-background flex items-center justify-center shadow-lg">
+                          <span className="text-blue-400 font-bold text-xl">⊕</span>
+                        </div>
+                        <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] text-muted-foreground font-medium">XOR</span>
+                      </div>
+
+                      {/* F-Box */}
+                      <div className="absolute" style={{ left: '75%', top: '45px', transform: 'translateX(-50%)' }}>
+                        <div className="px-4 py-2 bg-purple-500/20 border-2 border-dashed border-purple-500/60 rounded-lg flex flex-col items-center justify-center">
+                          <span className="text-purple-400 font-bold italic text-xl">f</span>
+                          <span className="text-purple-400/80 font-mono text-[9px]">
+                            {bitsToHex(currentStep.feistelOutput || []).slice(0, 8)}
+                          </span>
+                        </div>
+                        <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[10px] text-muted-foreground font-medium whitespace-nowrap">f-function</span>
+                      </div>
+
+                      {/* Key label */}
+                      <div className="absolute" style={{ right: '2%', top: '55px' }}>
+                        <div className="flex items-center gap-1 text-green-400">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                          </svg>
+                          <span className="text-xs font-bold">K<sub className="text-[9px]">{currentStep.round}</sub></span>
+                        </div>
+                        <span className="text-[9px] text-muted-foreground">Subkey</span>
+                      </div>
+
+                      {/* Swap label in middle */}
+                      <div className="absolute text-[10px] text-muted-foreground/70 font-medium" style={{ left: '55%', top: '165px' }}>
+                        SWAP
+                      </div>
+                    </div>
+
+                    {/* Bottom Row - L1 | R1 with values */}
+                    <div className="flex">
+                      <div className="flex-1 h-14 bg-gradient-to-r from-blue-500/25 to-blue-500/15 border-2 border-blue-500/50 flex flex-col items-center justify-center">
+                        <span className="text-blue-400/70 text-xs font-semibold">L<sub>{currentStep.round}</sub></span>
+                        <span className="text-blue-400 font-mono font-bold text-sm">
                           {(() => {
                             const prevRound = steps.find(s => s.type === "round" && s.round === currentStep.round - 1);
-                            return prevRound ? bitsToHex(prevRound.L).slice(0, 8) : bitsToHex(currentStep.L).slice(0, 8);
+                            return prevRound ? bitsToHex(prevRound.R) : bitsToHex(currentStep.L);
                           })()}
-                        </div>
+                        </span>
                       </div>
-                      <div className="absolute top-0 right-8 animate-in fade-in slide-in-from-right duration-500">
-                        <div className="px-6 py-3 bg-gradient-to-br from-orange-500/20 to-orange-500/10 border-2 border-orange-500/60 rounded-lg text-orange-400 font-mono text-lg font-bold shadow-lg ring-2 ring-orange-500/20">
-                          {(() => {
-                            const prevRound = steps.find(s => s.type === "round" && s.round === currentStep.round - 1);
-                            return prevRound ? bitsToHex(prevRound.R).slice(0, 8) : bitsToHex(currentStep.R).slice(0, 8);
-                          })()}
-                        </div>
+                      <div className="flex-1 h-14 bg-gradient-to-r from-orange-500/25 to-orange-500/15 border-2 border-orange-500/50 border-l-0 flex flex-col items-center justify-center">
+                        <span className="text-orange-400/70 text-xs font-semibold">R<sub>{currentStep.round}</sub></span>
+                        <span className="text-orange-400 font-mono font-bold text-sm">
+                          {bitsToHex(currentStep.R)}
+                        </span>
                       </div>
+                    </div>
 
-                      {/* Labels under top boxes */}
-                      <div className="absolute top-14 left-28 text-sm font-bold text-blue-400/80">L{currentStep.round - 1}</div>
-                      <div className="absolute top-14 right-28 text-sm font-bold text-orange-400/80">R{currentStep.round - 1}</div>
-
-                   
-
-                      {/* F-Function Dashed Box - Enhanced purple theme */}
-                      <div className="absolute left-1/2 transform -translate-x-1/2 animate-in zoom-in duration-500 delay-200" style={{ top: '100px', width: '280px' }}>
-                        <div className="border-2 border-dashed border-purple-500/60 rounded-xl p-5 bg-gradient-to-br from-purple-500/10 to-purple-500/5 shadow-xl ring-2 ring-purple-500/20">
-                          <div className="text-center space-y-2.5">
-                            {/* Expansion Permutation */}
-                            <div>
-                              <div className="text-xs text-orange-400 font-bold mb-1.5 uppercase tracking-wider">Expansion Permutation</div>
-                              <div className="px-4 py-2 bg-gradient-to-r from-orange-500/25 to-orange-500/15 border-2 border-orange-500/40 rounded-lg text-orange-400 text-sm font-mono font-bold shadow-md">
-                                32 → 48 bits
-                              </div>
-                              {/* Show expanded value */}
-                              <div className="mt-1.5 text-xs font-mono text-orange-300/90 px-2 py-1 bg-orange-500/10 rounded font-semibold">
-                                {bitsToHex(currentStep.expanded).slice(0, 12)}
-                              </div>
-                            </div>
-                            
-                            {/* XOR circle with key input */}
-                            <div className="relative flex items-center justify-center py-3">
-                              <div className="w-12 h-12 rounded-full border-2 border-foreground flex items-center justify-center bg-gradient-to-br from-background to-muted shadow-lg z-10">
-                                <div className="text-foreground font-bold text-2xl">⊕</div>
-                              </div>
-                              {/* Round key box on the right */}
-                              <div className="absolute" style={{ right: '-200px', top: '50%', transform: 'translateY(-50%)', width: '150px' }}>
-                                <div className="text-center">
-                                  <div className="text-xs text-muted-foreground mb-1 font-semibold">KEY</div>
-                                  <div className="px-3 py-2 bg-gradient-to-br from-green-500/15 to-green-500/10 border-2 border-green-500/60 rounded-lg shadow-lg ring-2 ring-green-500/20">
-                                    <div className="text-sm text-green-400 font-mono font-bold">
-                                      {currentStep.subkey ? bitsToHex(currentStep.subkey) : ""}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* S-Boxes */}
-                            <div className="py-1.5">
-                              <div className="text-xs text-purple-400 font-bold mb-2 uppercase tracking-wider">8 S Boxes</div>
-                              <div className="bg-gradient-to-br from-purple-500/25 to-purple-500/15 border-2 border-purple-500/40 rounded-lg px-2 py-2.5 shadow-md">
-                                <div className="text-purple-400 text-xs font-mono font-bold tracking-wider mb-2.5">
-                                  S₁  S₂  S₃  S₄  S₅  S₆  S₇  S₈
-                                </div>
-                                {/* Show individual S-box outputs */}
-                                {currentStep.sboxOutputs && (
-                                  <div className="flex justify-center items-center gap-1 flex-wrap">
-                                    {currentStep.sboxOutputs.map((output, i) => (
-                                      <div key={i} className="flex items-center">
-                                        <span className="text-purple-200 text-xs font-mono font-bold bg-purple-500/40 px-1.5 py-1 rounded border border-purple-500/50 shadow-sm hover:scale-110 transition-transform">
-                                          {output.map(bit => bit).join('')}
-                                        </span>
-                                        {i < 7 && <span className="text-purple-500/50 mx-0.5">|</span>}
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="mt-1.5 text-xs font-mono text-purple-300/90 px-2 py-1 bg-purple-500/10 rounded font-semibold">
-                                48 → 32 bits
-                              </div>
-                            </div>
-                            
-                            {/* P-Box */}
-                            <div className="mt-4">
-                              <div className="px-5 py-2.5 bg-gradient-to-r from-purple-500/35 to-purple-500/25 border-2 border-purple-500/50 rounded-lg text-purple-300 text-base font-bold tracking-wide shadow-md">
-                                P BOX
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                    {/* Round Equations - below the diagram */}
+                    <div className="flex justify-center gap-6 mt-3 py-2 px-3 bg-muted/20 rounded-lg border border-border/30">
+                      <div className="text-sm font-mono">
+                        <span className="text-blue-400">L<sub>{currentStep.round}</sub></span>
+                        <span className="text-muted-foreground"> = </span>
+                        <span className="text-orange-400">R<sub>{currentStep.round - 1}</sub></span>
                       </div>
-
-
-                      {/* Bottom XOR circle */}
-                      <div className="absolute left-1/2 transform -translate-x-1/2" style={{ top: '470px' }}>
-                        <div className="w-12 h-12 rounded-full border-2 border-foreground flex items-center justify-center bg-background shadow-lg z-10">
-                          <div className="text-foreground font-bold text-2xl">⊕</div>
-                        </div>
+                      <div className="text-sm font-mono">
+                        <span className="text-orange-400">R<sub>{currentStep.round}</sub></span>
+                        <span className="text-muted-foreground"> = </span>
+                        <span className="text-blue-400">L<sub>{currentStep.round - 1}</sub></span>
+                        <span className="text-muted-foreground"> ⊕ </span>
+                        <span className="text-purple-400">f(</span>
+                        <span className="text-orange-400">R<sub>{currentStep.round - 1}</sub></span>
+                        <span className="text-purple-400">, </span>
+                        <span className="text-green-400">K<sub>{currentStep.round}</sub></span>
+                        <span className="text-purple-400">)</span>
                       </div>
+                    </div>
 
+                  </div>
+                </div>
 
-
-                      {/* Bottom Output boxes - Enhanced styling */}
-                      <div className="absolute left-4 animate-in fade-in slide-in-from-left duration-500 delay-300" style={{ bottom: '15px' }}>
-                        <div className="px-6 py-3 bg-gradient-to-br from-blue-500/20 to-blue-500/10 border-2 border-blue-500/60 rounded-lg text-blue-400 font-mono text-lg font-bold shadow-lg ring-2 ring-blue-500/20">
-                          {(() => {
-                            const prevRound = steps.find(s => s.type === "round" && s.round === currentStep.round - 1);
-                            return prevRound ? bitsToHex(prevRound.R).slice(0, 8) : bitsToHex(currentStep.L).slice(0, 8);
-                          })()}
-                        </div>
-                      </div>
-                      <div className="absolute right-4 animate-in fade-in slide-in-from-right duration-500 delay-300" style={{ bottom: '15px' }}>
-                        <div className="px-6 py-3 bg-gradient-to-br from-orange-500/20 to-orange-500/10 border-2 border-orange-500/60 rounded-lg text-orange-400 font-mono text-lg font-bold shadow-lg ring-2 ring-orange-500/20">
-                          {bitsToHex(currentStep.R).slice(0, 8)}
-                        </div>
-                      </div>
-
-                      {/* Labels above bottom boxes */}
-                      <div className="absolute left-16 text-sm font-bold text-blue-400/80" style={{ bottom: '75px' }}>L{currentStep.round}</div>
-                      <div className="absolute right-16 text-sm font-bold text-orange-400/80" style={{ bottom: '75px' }}>R{currentStep.round}</div>
+                {/* Values Grid - Matches your app style */}
+                <div className="grid grid-cols-2 gap-3 mt-4 text-sm">
+                  <div className="border border-border/50 rounded-lg p-3 bg-muted/10">
+                    <div className="text-blue-400 font-semibold mb-1">L0</div>
+                    <div className="font-mono text-foreground/80">
+                      {(() => {
+                        const prevRound = steps.find(s => s.type === "round" && s.round === currentStep.round - 1);
+                        return prevRound ? bitsToHex(prevRound.L) : bitsToHex(currentStep.L);
+                      })()}
                     </div>
                   </div>
-
-                  {/* Round formula and f-function output */}
-                  <div className="text-center text-xs text-muted-foreground mt-4 pt-3 border-t border-border space-y-2">
-                    <div className="font-mono text-sm text-purple-300 font-semibold">
-                      f(R{currentStep.round - 1}, K{currentStep.round}) = {bitsToHex(currentStep.feistelOutput || []).slice(0, 8)}
+                  <div className="border border-border/50 rounded-lg p-3 bg-muted/10">
+                    <div className="text-orange-400 font-semibold mb-1">R0</div>
+                    <div className="font-mono text-foreground/80">
+                      {(() => {
+                        const prevRound = steps.find(s => s.type === "round" && s.round === currentStep.round - 1);
+                        return prevRound ? bitsToHex(prevRound.R) : bitsToHex(currentStep.R);
+                      })()}
                     </div>
-                    <div>
-                      L{currentStep.round} = R{currentStep.round - 1} • R{currentStep.round} = L{currentStep.round - 1} ⊕ f(R{currentStep.round - 1}, K{currentStep.round})
+                  </div>
+                  <div className="border border-border/50 rounded-lg p-3 bg-muted/10">
+                    <div className="text-green-400 font-semibold mb-1">K{currentStep.round}</div>
+                    <div className="font-mono text-foreground/80">
+                      {currentStep.subkey ? bitsToHex(currentStep.subkey) : ""}
+                    </div>
+                  </div>
+                  <div className="border border-border/50 rounded-lg p-3 bg-muted/10">
+                    <div className="text-purple-400 font-semibold mb-1">f(R, K)</div>
+                    <div className="font-mono text-foreground/80">
+                      {bitsToHex(currentStep.feistelOutput || [])}
+                    </div>
+                  </div>
+                  <div className="border border-border/50 rounded-lg p-3 bg-muted/10">
+                    <div className="text-blue-400 font-semibold mb-1">L1 = R0</div>
+                    <div className="font-mono text-foreground/80">
+                      {(() => {
+                        const prevRound = steps.find(s => s.type === "round" && s.round === currentStep.round - 1);
+                        return prevRound ? bitsToHex(prevRound.R) : bitsToHex(currentStep.L);
+                      })()}
+                    </div>
+                  </div>
+                  <div className="border border-border/50 rounded-lg p-3 bg-muted/10">
+                    <div className="text-orange-400 font-semibold mb-1">R1 = L ⊕ f</div>
+                    <div className="font-mono text-foreground/80">
+                      {bitsToHex(currentStep.R)}
                     </div>
                   </div>
                 </div>
+
               </div>
             )}
 

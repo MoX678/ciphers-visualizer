@@ -50,7 +50,7 @@ const INV_SBOX: number[] = [
 const RCON: number[] = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36];
 
 type AESState = number[][];
-type OperationType = "initial" | "subbytes" | "shiftrows" | "mixcolumns" | "addroundkey";
+type OperationType = "initial" | "subbytes" | "shiftrows" | "mixcolumns" | "addroundkey" | "keyexpansion";
 type AESStep = {
   name: string;
   description: string;
@@ -59,16 +59,17 @@ type AESStep = {
   operation: OperationType;
   round: number;
   roundKey?: AESState;
+  roundKeys?: AESState[];
 };
 
 // Helper functions
 function textToState(text: string): AESState {
-  const bytes = new Array(16).fill(0);
+  const bytes = new Array(16).fill(0); // 16 bytes for AES 
   for (let i = 0; i < Math.min(text.length, 16); i++) {
     bytes[i] = text.charCodeAt(i);
   }
   const state: AESState = [];
-  // Fill state matrix in column-major order
+  // Fill state matrix in column-major  first row is 0,4,8,12
   for (let c = 0; c < 4; c++) {
     state.push([bytes[c], bytes[c + 4], bytes[c + 8], bytes[c + 12]]);
   }
@@ -137,10 +138,12 @@ function subBytes(state: AESState): AESState {
 function invSubBytes(state: AESState): AESState {
   return state.map(col => col.map(b => INV_SBOX[b]));
 }
-
+// first row unchanged
+// second row shift left by 1
+// third row shift left by 2
 function shiftRows(state: AESState): AESState {
   const result = copyState(state);
-  const temp1 = result[0][1];
+  const temp1 = result[0][1];  
   result[0][1] = result[1][1];
   result[1][1] = result[2][1];
   result[2][1] = result[3][1];
@@ -245,7 +248,7 @@ function keyExpansion(key: string): AESState[] {
 }
 
 function aesEncryptWithSteps(plaintext: string, key: string): AESStep[] {
-  const steps: AESStep[] = [];
+  const steps: AESStep[] = []; 
   
   // Create empty state for block representation
   const emptyState: AESState = [
@@ -255,11 +258,11 @@ function aesEncryptWithSteps(plaintext: string, key: string): AESStep[] {
     [0, 0, 0, 0]
   ];
   
-  // Add Block to State conversion step
+  // Add Block to State conversion step (combines block conversion and initial state)
   const inputState = textToState(plaintext);
   steps.push({
     name: "Block to State",
-    description: "Convert 16-byte input block to 4×4 state matrix (column-major order)",
+    description: "Convert 16-byte input block to 4×4 state matrix (column-major order) - ready for encryption",
     state: inputState,
     prevState: emptyState,
     operation: "initial",
@@ -269,14 +272,15 @@ function aesEncryptWithSteps(plaintext: string, key: string): AESStep[] {
   let state = textToState(plaintext);
   const roundKeys = keyExpansion(key);
   
-  const initialState = copyState(state);
+  // Add Key Expansion step (showing the derived round keys)
   steps.push({
-    name: "Initial State",
-    description: "Input arranged in state matrix ready for encryption",
-    state: copyState(state),
+    name: "Key Expansion",
+    description: "Generate 11 round keys from the original 128-bit key using the AES key schedule",
+    state: roundKeys[0],
     prevState: emptyState,
-    operation: "initial",
+    operation: "keyexpansion",
     round: 0,
+    roundKeys: roundKeys,
   });
   
   let prevState = copyState(state);
@@ -501,26 +505,29 @@ function StateMatrix({
   return (
     <div className="flex flex-col items-center group">
       <div className="text-xs font-medium text-muted-foreground mb-2">{label}</div>
-      <div className={`
-        grid grid-cols-4 gap-1 md:gap-1.5 p-2 md:p-3 rounded-xl bg-gradient-to-br from-background/50 to-background/80
-        ${highlight ? "ring-2 ring-primary/70 shadow-lg shadow-primary/20" : "ring-1 ring-border/50"}
-        transition-all duration-300 hover:scale-105
-      `}>
-        {[0, 1, 2, 3].map(row => (
-          [0, 1, 2, 3].map(col => (
-            <div
-              key={`${row}-${col}`}
-              className={`
-                w-8 h-8 md:w-12 md:h-12 flex items-center justify-center font-mono text-xs md:text-sm font-semibold rounded-lg
-                transition-all duration-300 border-2
-                ${colorClass}
-                hover:scale-110 hover:shadow-md cursor-default
-              `}
-            >
-              {hex[col][row]}
-            </div>
-          ))
-        ))}
+      <div className={cn(
+        "p-2 md:p-3 rounded-xl bg-gradient-to-br from-background/50 to-background/80",
+        highlight ? "ring-2 ring-primary/70 shadow-lg shadow-primary/20" : "ring-1 ring-border/50",
+        "transition-all duration-300 hover:scale-105"
+      )}>
+        {/* Grid with spacing */}
+        <div className="grid grid-cols-4 gap-1 md:gap-1.5">
+          {[0, 1, 2, 3].map(row => (
+            [0, 1, 2, 3].map(col => (
+              <div
+                key={`${row}-${col}`}
+                className={cn(
+                  "w-8 h-8 md:w-11 md:h-11 flex items-center justify-center font-mono text-xs md:text-sm font-semibold",
+                  "transition-all duration-300 rounded-md border",
+                  colorClass,
+                  "hover:brightness-125 hover:scale-105 cursor-default"
+                )}
+              >
+                {hex[col][row]}
+              </div>
+            ))
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -569,200 +576,258 @@ function SubBytesDiagram({ prevState, state }: { prevState: AESState; state: AES
         SubBytes Operation - Position [{exampleRow}][{exampleCol}] ({currentPosition + 1}/16)
       </h4>
       
-      {/* Horizontal Layout: Before → Operation → After */}
-      <div className="flex flex-col lg:flex-row items-center justify-center gap-4 lg:gap-6">
-        {/* Before State Matrix */}
+      {/* Horizontal Layout: Before → Operation → After - Same Style */}
+      <div className="flex flex-col lg:flex-row items-center justify-center gap-6 lg:gap-8">
+        {/* Before State Matrix - Highlight the cell being looked up */}
         <div className="animate-in fade-in slide-in-from-left-4 duration-500">
-          <StateMatrix 
-            state={prevState} 
-            label="Before" 
-            colorClass="bg-orange-500/10 text-orange-400 border-orange-500"
-          />
+          <div className="flex flex-col items-center group">
+            <div className="text-xs font-medium text-muted-foreground mb-2">Before</div>
+            <div className="p-2 md:p-3 rounded-xl bg-gradient-to-br from-background/50 to-background/80 ring-1 ring-border/50 transition-all duration-300 hover:scale-105">
+              <div className="grid grid-cols-4 gap-1.5 md:gap-2">
+                {[0, 1, 2, 3].map(row => 
+                  [0, 1, 2, 3].map(col => {
+                    const isHighlighted = row === exampleRow && col === exampleCol && !showComplete;
+                    return (
+                      <div
+                        key={`${row}-${col}`}
+                        className={cn(
+                          "w-10 h-10 md:w-12 md:h-12 flex items-center justify-center font-mono text-sm md:text-base font-semibold",
+                          "transition-all duration-300 rounded-md border",
+                          isHighlighted
+                            ? "bg-gradient-to-b from-orange-500/40 to-orange-500/20 border-orange-400 text-orange-200 ring-2 ring-orange-400/60"
+                            : "bg-gradient-to-b from-muted/40 to-muted/20 border-border/50 text-foreground/70",
+                          "hover:brightness-125 cursor-default"
+                        )}
+                      >
+                        {prevHex[col][row]}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
         </div>
         
-        {/* Operation Indicator */}
-        <div className="flex flex-col items-center gap-3 animate-in zoom-in duration-300 delay-100">
-          <div className="text-3xl lg:text-4xl text-orange-400 animate-pulse font-bold">S</div>
-          <div className="px-3 py-2 rounded-full text-sm font-semibold bg-orange-500/30 text-orange-200 border border-orange-400">
-            S-box
-          </div>
-          <div className="px-2 py-1 rounded-full text-xs font-medium bg-orange-500/20 text-orange-300">
+        {/* Simple Operation Indicator */}
+        <div className="flex flex-col items-center gap-2 animate-in zoom-in duration-300 delay-100">
+          <div className="text-3xl lg:text-4xl text-orange-400 font-bold">S</div>
+          <div className="text-xs font-semibold text-orange-300">S-box</div>
+          <div className="px-2 py-1 rounded-full text-xs font-medium bg-orange-500/20 text-orange-300 border border-orange-500/30">
             {currentPosition + 1}/16
           </div>
         </div>
         
-        {/* After State Matrix */}
+        {/* After State Matrix - With orange highlighting */}
         <div className="animate-in fade-in slide-in-from-right-4 duration-500 delay-200">
-          <StateMatrix 
-            state={state} 
-            label="After" 
-            highlight
-            colorClass="bg-orange-500/20 text-orange-200 border-orange-400"
-          />
+          <div className="flex flex-col items-center group">
+            <div className="text-xs font-medium text-muted-foreground mb-2">After</div>
+            <div className="p-2 md:p-3 rounded-xl bg-gradient-to-br from-background/50 to-background/80 ring-1 ring-orange-500/30 transition-all duration-300 hover:scale-105">
+              <div className="grid grid-cols-4 gap-1.5 md:gap-2">
+                {[0, 1, 2, 3].map(row => 
+                  [0, 1, 2, 3].map(col => {
+                    const isHighlighted = row === exampleRow && col === exampleCol && !showComplete;
+                    return (
+                      <div
+                        key={`${row}-${col}`}
+                        className={cn(
+                          "w-10 h-10 md:w-12 md:h-12 flex items-center justify-center font-mono text-sm md:text-base font-semibold",
+                          "transition-all duration-300 rounded-md border",
+                          isHighlighted
+                            ? "bg-gradient-to-b from-orange-500/60 to-orange-500/40 border-orange-400 text-orange-100 ring-2 ring-orange-400 shadow-lg"
+                            : "bg-gradient-to-b from-orange-500/30 to-orange-500/10 border-orange-500/50 text-orange-300",
+                          "hover:brightness-125 cursor-default"
+                        )}
+                      >
+                        {currHex[col][row]}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Enhanced S-box Lookup Details */}
-      {!showComplete && (
-        <div className="bg-background/60 rounded-lg p-4 border border-orange-500/20">
-          <h6 className="text-sm text-orange-300 mb-4 text-center font-semibold">
-            S-box Lookup Details
-          </h6>
-          
-          {/* Current Byte Transformation */}
-          <div className="text-center">
-            <div className="text-center mb-3">
-              <div className="text-sm font-semibold text-orange-300 mb-1">Current Transformation</div>
-              <div className="text-xs text-muted-foreground">Position [{exampleRow}][{exampleCol}]</div>
+      {/* Compact S-box Table with Integrated Lookup Details */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h5 className="text-sm font-semibold text-orange-300">AES S-box Lookup Table</h5>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 text-xs">
+              <div className="w-3 h-3 rounded bg-orange-500/50 border border-orange-500"></div>
+              <span className="text-muted-foreground">Column</span>
             </div>
-            
-            <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="flex items-center gap-1.5 text-xs">
+              <div className="w-3 h-3 rounded bg-amber-500/50 border border-amber-500"></div>
+              <span className="text-muted-foreground">Row</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs">
+              <div className="w-3 h-3 rounded bg-orange-500 border border-orange-400"></div>
+              <span className="text-muted-foreground">Result</span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex flex-col lg:flex-row gap-4 items-center justify-center">
+          {/* Lookup Details Panel - Connected Tape */}
+          {!showComplete && (
+            <div className="flex items-stretch">
               {/* Input */}
-              <div className="text-center">
-                <div className="text-xs text-muted-foreground mb-1">Input</div>
-                <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center font-mono text-lg font-bold text-orange-400 border-2 border-orange-500/60">
-                  {inputByte}
+              <div className="flex flex-col items-center">
+                <div className="text-[10px] text-muted-foreground font-medium mb-1">Input</div>
+                <div className="px-1.5 py-1.5 rounded-l-lg bg-gradient-to-r from-orange-500/30 to-orange-500/20 border border-orange-500/40 border-r-0">
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-b from-orange-500/30 to-orange-500/10 rounded-md flex items-center justify-center font-mono text-base md:text-lg font-bold text-orange-400 border border-orange-500/50">
+                    {inputByte}
+                  </div>
                 </div>
-                <div className="text-xs text-orange-400 mt-1">
+                <div className="text-[9px] text-orange-400 mt-1">
                   Row: {inputByte[0]} | Col: {inputByte[1]}
                 </div>
               </div>
               
-              <div className="text-orange-400 text-2xl">→</div>
-              
-              {/* S-box */}
-              <div className="text-center">
-                <div className="text-xs text-muted-foreground mb-1">S-box</div>
-                <div className="w-12 h-12 bg-orange-500/40 rounded-lg flex items-center justify-center font-mono text-sm font-bold text-orange-200 border-2 border-orange-400">
-                  [{row}][{col}]
+              {/* S-box Index */}
+              <div className="flex flex-col items-center">
+                <div className="text-[10px] text-muted-foreground font-medium mb-1">S-box</div>
+                <div className="px-1.5 py-1.5 bg-gradient-to-r from-orange-500/20 via-orange-500/30 to-orange-500/20 border-y border-orange-500/40">
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-b from-orange-500/40 to-orange-500/20 rounded-md flex items-center justify-center font-mono text-xs font-bold text-orange-200 border border-orange-400/60">
+                    [{row}][{col}]
+                  </div>
                 </div>
-                <div className="text-xs text-orange-400 mt-1">
-                  {row} = {row}, {col} = {col}
+                <div className="text-[9px] text-orange-400 mt-1">
+                  Lookup
                 </div>
               </div>
-              
-              <div className="text-orange-400 text-2xl">→</div>
               
               {/* Output */}
-              <div className="text-center">
-                <div className="text-xs text-muted-foreground mb-1">Output</div>
-                <div className="w-12 h-12 bg-orange-500/60 rounded-lg flex items-center justify-center font-mono text-lg font-bold text-orange-100 border-2 border-orange-400 shadow-md animate-pulse">
-                  {outputByte}
+              <div className="flex flex-col items-center">
+                <div className="text-[10px] text-muted-foreground font-medium mb-1">Output</div>
+                <div className="px-1.5 py-1.5 rounded-r-lg bg-gradient-to-r from-orange-500/20 to-orange-500/40 border border-orange-500/50 border-l-0">
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-b from-orange-500/60 to-orange-500/30 rounded-md flex items-center justify-center font-mono text-base md:text-lg font-bold text-orange-100 border border-orange-400 shadow-lg ring-2 ring-orange-400/50 animate-pulse">
+                    {outputByte}
+                  </div>
                 </div>
-                <div className="text-xs text-orange-300 mt-1 font-semibold">
-                  Substituted!
+                <div className="text-[9px] text-orange-300 font-semibold mt-1">
+                  Substituted
                 </div>
               </div>
+            </div>
+          )}
+          
+          {/* S-box Table - Vigenère Style */}
+          <div className="p-2 rounded-xl bg-gradient-to-br from-muted/30 to-muted/10 border border-orange-500/20 overflow-x-auto">
+            {/* Column headers */}
+            <div className="flex gap-0.5 min-w-max">
+              <div className="w-5 h-5 md:w-6 md:h-6 flex items-center justify-center text-[10px] text-muted-foreground font-semibold">
+                +
+              </div>
+              {Array.from({length: 16}, (_, i) => (
+                <div 
+                  key={i} 
+                  className={cn(
+                    "w-5 h-5 md:w-6 md:h-6 flex items-center justify-center font-mono text-[10px] rounded transition-all duration-200",
+                    i === col && !showComplete
+                      ? "bg-orange-500 text-white font-bold shadow-md shadow-orange-500/30" 
+                      : "text-orange-400 bg-orange-500/10"
+                  )}
+                >
+                  {i.toString(16).toUpperCase()}
+                </div>
+              ))}
             </div>
             
-            <div className="text-center bg-background/30 rounded p-2">
-              <div className="text-xs text-muted-foreground">
-                {inputByte} → S-box[{row.toString(16).toUpperCase()}][{col.toString(16).toUpperCase()}] = <span className="text-orange-300 font-semibold">{outputByte}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Compact S-box Table */}
-      <div className="space-y-2">
-        <h5 className="text-sm font-semibold text-orange-300 text-center">AES S-box Lookup Table</h5>
-        <div className="max-w-full lg:max-w-4xl mx-auto bg-background/50 rounded-lg p-2 md:p-3 border border-orange-500/20 overflow-x-auto">
-          {/* Column headers */}
-          <div className="flex gap-0.5 mb-1 min-w-max">
-            <div className="w-4 h-4 md:w-6 md:h-6 text-xs text-orange-400 font-bold text-center flex items-center justify-center"></div>
-            {Array.from({length: 16}, (_, i) => (
-              <div 
-                key={i} 
-                className={`w-4 h-4 md:w-6 md:h-6 text-[10px] md:text-xs font-mono text-center flex items-center justify-center rounded transition-all duration-500 ${
-                  i === col && !showComplete
-                    ? 'bg-orange-500/50 text-orange-200 ring-1 md:ring-2 ring-orange-400 animate-pulse scale-110' 
-                    : 'text-muted-foreground hover:bg-orange-500/10'
-                }`}
-              >
-                {i.toString(16).toUpperCase()}
-              </div>
-            ))}
-          </div>
-          
-          {/* S-box rows */}
-          <div className="min-w-max">
-            {Array.from({length: 16}, (_, r) => (
-              <div key={r} className="flex gap-0.5 mb-0.5">
-                {/* Row header */}
-                <div 
-                  className={`w-4 h-4 md:w-6 md:h-6 text-[10px] md:text-xs font-mono text-center flex items-center justify-center rounded transition-all duration-500 ${
-                    r === row && !showComplete
-                      ? 'bg-orange-500/50 text-orange-200 ring-1 md:ring-2 ring-orange-400 animate-pulse scale-110' 
-                      : 'text-muted-foreground hover:bg-orange-500/10'
-                  }`}
-                >
-                  {r.toString(16).toUpperCase()}
-                </div>
-                {/* S-box values */}
-                {Array.from({length: 16}, (_, c) => {
-                  const sboxValue = SBOX[r * 16 + c];
-                  const isHighlighted = r === row && c === col && !showComplete;
-                  return (
+            {/* S-box rows */}
+            <div className="min-w-max">
+              {Array.from({length: 16}, (_, r) => {
+                const isKeyRow = r === row && !showComplete;
+                return (
+                  <div key={r} className="flex gap-0.5 mt-0.5">
+                    {/* Row header */}
                     <div 
-                      key={c} 
-                      className={`w-4 h-4 md:w-6 md:h-6 text-[9px] md:text-xs font-mono text-center flex items-center justify-center rounded transition-all duration-700 ${
-                        isHighlighted 
-                          ? 'bg-orange-500/70 text-orange-100 ring-2 md:ring-4 ring-orange-400 scale-110 md:scale-125 font-bold shadow-lg animate-bounce z-10' 
-                          : (r === row || c === col) && !showComplete
-                          ? 'bg-orange-500/20 text-orange-200 scale-105'
-                          : 'bg-muted/30 text-muted-foreground hover:bg-orange-500/10'
-                      }`}
+                      className={cn(
+                        "w-5 h-5 md:w-6 md:h-6 flex items-center justify-center font-mono text-[10px] rounded transition-all duration-200",
+                        isKeyRow 
+                          ? "bg-amber-500 text-white font-bold shadow-md shadow-amber-500/30" 
+                          : "text-amber-400 bg-amber-500/10"
+                      )}
                     >
-                      {sboxValue.toString(16).padStart(2, '0').toUpperCase()}
+                      {r.toString(16).toUpperCase()}
                     </div>
-                  );
-                })}
-              </div>
-            ))}
+                    {/* S-box values */}
+                    {Array.from({length: 16}, (_, c) => {
+                      const sboxValue = SBOX[r * 16 + c];
+                      const isIntersection = r === row && c === col && !showComplete;
+                      const isInActiveRow = isKeyRow;
+                      const isInActiveCol = c === col && !showComplete;
+                      
+                      return (
+                        <div 
+                          key={c} 
+                          className={cn(
+                            "w-5 h-5 md:w-6 md:h-6 flex items-center justify-center font-mono text-[9px] md:text-[10px] rounded transition-all duration-200",
+                            isIntersection 
+                              ? "bg-orange-500 text-orange-50 font-bold ring-1 ring-orange-400 shadow-md shadow-orange-500/40" 
+                              : isInActiveRow && isInActiveCol
+                                ? "bg-orange-500/30 text-orange-200"
+                                : isInActiveRow
+                                  ? "bg-amber-500/20 text-amber-300"
+                                  : isInActiveCol
+                                    ? "bg-orange-500/20 text-orange-300"
+                                    : "text-foreground/40 hover:bg-muted/50 hover:text-foreground/70"
+                          )}
+                        >
+                          {sboxValue.toString(16).padStart(2, '0').toUpperCase()}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
-      
-      <p className="text-xs text-muted-foreground text-center bg-background/50 rounded-lg p-3">
-        <span className="text-orange-300 font-semibold">Auto-cycling:</span> Each byte is independently substituted using the AES S-box lookup table
-      </p>
     </div>
   );
 }
 
 function ShiftRowsDiagram({ prevState, state }: { prevState: AESState; state: AESState }) {
   const getRowColor = (row: number) => {
-    return row === 0 ? "blue" : 
-           row === 1 ? "green" :
-           row === 2 ? "yellow" :
-           "red";
+    const colors = [
+      { bg: "from-blue-500/30 to-blue-500/10", border: "border-blue-500/50", text: "text-blue-300" },
+      { bg: "from-green-500/30 to-green-500/10", border: "border-green-500/50", text: "text-green-300" },
+      { bg: "from-yellow-500/30 to-yellow-500/10", border: "border-yellow-500/50", text: "text-yellow-300" },
+      { bg: "from-red-500/30 to-red-500/10", border: "border-red-500/50", text: "text-red-300" }
+    ];
+    return colors[row];
   };
 
-  // Create color-coded state matrices
+  // Create color-coded state matrices with spacing
   const ColorCodedStateMatrix = ({ state, label }: { state: AESState; label: string }) => {
     const hex = stateToHex(state);
     return (
       <div className="flex flex-col items-center group">
         <div className="text-xs font-medium text-muted-foreground mb-2">{label}</div>
-        <div className="grid grid-cols-4 gap-1 md:gap-1.5 p-2 md:p-3 rounded-xl bg-gradient-to-br from-background/50 to-background/80 ring-1 ring-border/50 transition-all duration-300 hover:scale-105">
-          {[0, 1, 2, 3].map(row => (
-            [0, 1, 2, 3].map(col => {
+        <div className="p-2 md:p-3 rounded-xl bg-gradient-to-br from-background/50 to-background/80 ring-1 ring-border/50 transition-all duration-300 hover:scale-105">
+          <div className="grid grid-cols-4 gap-1 md:gap-1.5">
+            {[0, 1, 2, 3].map(row => {
               const color = getRowColor(row);
-              return (
+              return [0, 1, 2, 3].map(col => (
                 <div
                   key={`${row}-${col}`}
-                  className={`
-                    w-8 h-8 md:w-12 md:h-12 flex items-center justify-center font-mono text-xs md:text-sm font-semibold rounded-lg
-                    transition-all duration-300 border-2 hover:scale-110 hover:shadow-md cursor-default
-                    bg-${color}-500/20 text-${color}-200 border-${color}-500/50
-                  `}
+                  className={cn(
+                    "w-10 h-10 md:w-12 md:h-12 flex items-center justify-center font-mono text-sm md:text-base font-semibold",
+                    "transition-all duration-300 rounded-md border",
+                    `bg-gradient-to-b ${color.bg} ${color.border} ${color.text}`,
+                    "hover:brightness-125 hover:scale-105 cursor-default"
+                  )}
                 >
                   {hex[col][row]}
                 </div>
-              );
-            })
-          ))}
+              ));
+            })}
+          </div>
         </div>
       </div>
     );
@@ -773,20 +838,17 @@ function ShiftRowsDiagram({ prevState, state }: { prevState: AESState; state: AE
       <h4 className="font-bold text-blue-400 text-center text-sm">ShiftRows Operation</h4>
       
       {/* Horizontal Layout: Before → Operation → After */}
-      <div className="flex flex-col lg:flex-row items-center justify-center gap-4 lg:gap-6">
+      <div className="flex flex-col lg:flex-row items-center justify-center gap-6 lg:gap-8">
         {/* Before State Matrix */}
         <div className="animate-in fade-in slide-in-from-left-4 duration-500">
           <ColorCodedStateMatrix state={prevState} label="Before" />
         </div>
         
         {/* Operation Indicator */}
-        <div className="flex flex-col items-center gap-3 animate-in zoom-in duration-300 delay-100">
+        <div className="flex flex-col items-center gap-2 animate-in zoom-in duration-300 delay-100">
           <div className="text-3xl lg:text-4xl text-blue-400 animate-pulse font-bold">↻</div>
-          <div className="px-3 py-2 rounded-full text-sm font-semibold bg-blue-500/30 text-blue-200 border border-blue-400">
+          <div className="px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-500/30 text-blue-200 border border-blue-400">
             Shift Rows
-          </div>
-          <div className="px-2 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300">
-            Circular Left
           </div>
         </div>
         
@@ -796,9 +858,9 @@ function ShiftRowsDiagram({ prevState, state }: { prevState: AESState; state: AE
         </div>
       </div>
 
-      {/* Row Shift Details - Compact */}
-      <div className="bg-background/60 rounded-lg p-3 border border-blue-500/20">
-        <h6 className="text-sm text-blue-300 mb-3 text-center font-semibold">Shift Pattern by Row</h6>
+      {/* Row Shift Details */}
+      <div className="bg-background/60 rounded-lg p-4 border border-blue-500/20">
+        <h6 className="text-xs text-blue-300 mb-3 text-center font-semibold">Shift Pattern by Row</h6>
         
         <div className="space-y-2">
           {[0, 1, 2, 3].map(row => {
@@ -807,29 +869,50 @@ function ShiftRowsDiagram({ prevState, state }: { prevState: AESState; state: AE
             const shiftAmount = row;
             
             return (
-              <div key={row} className={`flex items-center justify-between p-2 rounded border border-${color}-500/30 bg-${color}-500/10`}>
-                <div className={`text-xs font-semibold text-${color}-300 min-w-[60px]`}>
-                  Row {row}:
+              <div key={row} className={cn("flex items-center justify-between p-2.5 rounded-lg border", color.border.replace("/50", "/30"), "bg-gradient-to-r", color.bg.replace("from-", "from-").replace("/30", "/10").replace("/10", "/5"))}>
+                <div className={cn("text-sm font-bold min-w-[40px]", color.text)}>
+                  R{row}:
                 </div>
                 
-                <div className="flex items-center gap-2 flex-1 justify-center">
-                  {/* Before */}
-                  <div className="flex gap-0.5">
-                    {[0, 1, 2, 3].map(col => (
-                      <div key={col} className={`h-6 w-6 flex items-center justify-center font-mono text-[10px] font-semibold rounded border bg-${color}-500/20 text-${color}-300 border-${color}-500/40`}>
-                        {prevHex[col][row]}
-                      </div>
-                    ))}
+                <div className="flex items-center gap-3 flex-1 justify-center">
+                  {/* Before - Show which elements will shift */}
+                  <div className="flex gap-1">
+                    {[0, 1, 2, 3].map((col) => {
+                      // Elements that will wrap around are highlighted
+                      const willWrap = col < shiftAmount;
+                      return (
+                        <div key={col} className={cn(
+                          "h-8 w-8 flex items-center justify-center font-mono text-xs font-semibold rounded-md border transition-all",
+                          willWrap 
+                            ? cn("ring-2 ring-offset-1 ring-offset-background animate-pulse", color.border.replace("border-", "ring-"), `bg-gradient-to-b ${color.bg.replace("/30", "/50").replace("/10", "/30")} ${color.border} ${color.text}`)
+                            : cn(`bg-gradient-to-b ${color.bg} ${color.border} ${color.text}`)
+                        )}>
+                          {prevHex[col][row]}
+                        </div>
+                      );
+                    })}
                   </div>
                   
-                  <div className={`text-${color}-400 text-sm`}>→</div>
+                  {/* Shift Arrow with amount */}
+                  <div className="flex flex-col items-center">
+                    <div className={cn("text-base font-bold", color.text)}>
+                      {shiftAmount === 0 ? "=" : `←${shiftAmount}`}
+                    </div>
+                  </div>
                   
-                  {/* After */}
-                  <div className="flex gap-0.5">
-                    {[0, 1, 2, 3].map(col => {
+                  {/* After - Show where elements ended up */}
+                  <div className="flex gap-1">
+                    {[0, 1, 2, 3].map((col) => {
                       const sourceCol = (col + shiftAmount) % 4;
+                      // Elements that wrapped from the beginning are highlighted in result
+                      const wasWrapped = sourceCol < shiftAmount;
                       return (
-                        <div key={col} className={`h-6 w-6 flex items-center justify-center font-mono text-[10px] font-semibold rounded border bg-${color}-500/30 text-${color}-200 border-${color}-400`}>
+                        <div key={col} className={cn(
+                          "h-8 w-8 flex items-center justify-center font-mono text-xs font-bold rounded-md border transition-all",
+                          wasWrapped 
+                            ? cn("ring-2 ring-offset-1 ring-offset-background shadow-lg", color.border.replace("border-", "ring-"), `bg-gradient-to-b ${color.bg.replace("/30", "/60").replace("/10", "/40")} ${color.border} ${color.text}`)
+                            : cn(`bg-gradient-to-b ${color.bg.replace("/30", "/40").replace("/10", "/20")} ${color.border} ${color.text}`)
+                        )}>
                           {prevHex[sourceCol][row]}
                         </div>
                       );
@@ -837,8 +920,8 @@ function ShiftRowsDiagram({ prevState, state }: { prevState: AESState; state: AE
                   </div>
                 </div>
                 
-                <div className="text-[10px] text-muted-foreground min-w-[50px] text-right">
-                  {row === 0 ? "No shift" : `← ${row}`}
+                <div className="text-xs text-muted-foreground min-w-[55px] text-right">
+                  {row === 0 ? "No shift" : `wrap ${row}`}
                 </div>
               </div>
             );
@@ -846,24 +929,25 @@ function ShiftRowsDiagram({ prevState, state }: { prevState: AESState; state: AE
         </div>
       </div>
 
-      {/* Legend */}
-      <div className="flex justify-center gap-4 text-xs flex-wrap">
-        <span className="text-blue-400">■ Row 0: Blue</span>
-        <span className="text-green-400">■ Row 1: Green</span>
-        <span className="text-yellow-400">■ Row 2: Yellow</span>
-        <span className="text-red-400">■ Row 3: Red</span>
+      {/* Compact Legend */}
+      <div className="flex justify-center gap-2 text-[10px] flex-wrap">
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-400"></span>R0</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400"></span>R1</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-400"></span>R2</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400"></span>R3</span>
+        <span className="text-muted-foreground ml-2">• Ring = wrapped elements</span>
       </div>
       
-      <p className="text-xs text-muted-foreground text-center bg-background/50 rounded-lg p-3">
-        Each row shifts left by its row number with circular wraparound, maintaining byte positions within rows
+      <p className="text-[10px] text-muted-foreground text-center">
+        Each row shifts left by its row number. Highlighted elements wrap around.
       </p>
     </div>
   );
 }
 
 function MixColumnsDiagram({ prevState, state }: { prevState: AESState; state: AESState }) {
+  const [currentCol, setCurrentCol] = useState(0);
   const [currentRow, setCurrentRow] = useState(0);
-  const [showComplete, setShowComplete] = useState(false);
   const prevHex = stateToHex(prevState);
   const stateHex = stateToHex(state);
   
@@ -875,12 +959,12 @@ function MixColumnsDiagram({ prevState, state }: { prevState: AESState; state: A
     [3, 1, 1, 2]
   ];
 
-  // Input column values (working with first column for demo)
+  // Input column values for current column
   const inputCol = [
-    parseInt(prevHex[0][0], 16),
-    parseInt(prevHex[0][1], 16),
-    parseInt(prevHex[0][2], 16),
-    parseInt(prevHex[0][3], 16)
+    parseInt(prevHex[currentCol][0], 16),
+    parseInt(prevHex[currentCol][1], 16),
+    parseInt(prevHex[currentCol][2], 16),
+    parseInt(prevHex[currentCol][3], 16)
   ];
 
   // Calculate results for each row
@@ -894,18 +978,19 @@ function MixColumnsDiagram({ prevState, state }: { prevState: AESState; state: A
     return { terms, finalResult };
   });
 
-  // Auto-cycle through rows
+  // Auto-cycle through all columns and rows - loops forever
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentRow(prev => {
         if (prev < 3) {
           return prev + 1;
         } else {
-          setShowComplete(true);
-          return 3; // Stay on last row
+          // Move to next column
+          setCurrentCol(prevCol => (prevCol + 1) % 4);
+          return 0;
         }
       });
-    }, 2000); // 2 seconds per row
+    }, 1500); // 1.5 seconds per row
     return () => clearInterval(interval);
   }, []);
 
@@ -914,72 +999,111 @@ function MixColumnsDiagram({ prevState, state }: { prevState: AESState; state: A
   return (
     <div className="rounded-xl p-6 space-y-6 border border-purple-500/30 shadow-lg">
       <h4 className="font-bold text-purple-400 text-center text-sm">
-        MixColumns Operation - Row {currentRow + 1} ({currentRow + 1}/4)
+        MixColumns Operation - Column {currentCol + 1}, Row {currentRow + 1}
       </h4>
       
       {/* Horizontal Layout: Before → Operation → After */}
-      <div className="flex flex-col lg:flex-row items-center justify-center gap-4 lg:gap-6">
-        {/* Before State Matrix */}
+      <div className="flex flex-col lg:flex-row items-center justify-center gap-6 lg:gap-8">
+        {/* Before State Matrix - Highlight the current column */}
         <div className="animate-in fade-in slide-in-from-left-4 duration-500">
-          <StateMatrix 
-            state={prevState} 
-            label="Before" 
-            colorClass="bg-purple-500/10 text-purple-400 border-purple-500"
-          />
+          <div className="flex flex-col items-center group">
+            <div className="text-xs font-medium text-muted-foreground mb-2">Before</div>
+            <div className="p-2 md:p-3 rounded-xl bg-gradient-to-br from-background/50 to-background/80 ring-1 ring-border/50 transition-all duration-300 hover:scale-105">
+              <div className="grid grid-cols-4 gap-1.5 md:gap-2">
+                {[0, 1, 2, 3].map(row => 
+                  [0, 1, 2, 3].map(col => {
+                    const isInCurrentCol = col === currentCol;
+                    return (
+                      <div
+                        key={`${row}-${col}`}
+                        className={cn(
+                          "w-10 h-10 md:w-12 md:h-12 flex items-center justify-center font-mono text-sm md:text-base font-semibold",
+                          "transition-all duration-300 rounded-md border",
+                          isInCurrentCol
+                            ? "bg-gradient-to-b from-purple-500/40 to-purple-500/20 border-purple-400 text-purple-200 ring-2 ring-purple-400/60"
+                            : "bg-gradient-to-b from-muted/40 to-muted/20 border-border/50 text-foreground/70",
+                          "hover:brightness-125 cursor-default"
+                        )}
+                      >
+                        {prevHex[col][row]}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
         </div>
         
         {/* Operation Indicator */}
-        <div className="flex flex-col items-center gap-3 animate-in zoom-in duration-300 delay-100">
-          <div className="text-3xl lg:text-4xl text-purple-400 animate-pulse font-bold">×</div>
-          <div className="px-3 py-2 rounded-full text-sm font-semibold bg-purple-500/30 text-purple-200 border border-purple-400">
-            MixColumns
-          </div>
-          <div className="px-2 py-1 rounded-full text-xs font-medium bg-purple-500/20 text-purple-300">
+        <div className="flex flex-col items-center gap-2 animate-in zoom-in duration-300 delay-100">
+          <div className="text-3xl lg:text-4xl text-purple-400 font-bold">×</div>
+          <div className="text-xs font-semibold text-purple-300">MixColumns</div>
+          <div className="px-2 py-1 rounded-full text-xs font-medium bg-purple-500/20 text-purple-300 border border-purple-500/30">
             Row {currentRow + 1}/4
           </div>
         </div>
         
-        {/* After State Matrix */}
+        {/* After State Matrix - With purple highlighting */}
         <div className="animate-in fade-in slide-in-from-right-4 duration-500 delay-200">
-          <StateMatrix 
-            state={state} 
-            label="After" 
-            highlight
-            colorClass="bg-purple-500/20 text-purple-200 border-purple-400"
-          />
+          <div className="flex flex-col items-center group">
+            <div className="text-xs font-medium text-muted-foreground mb-2">After</div>
+            <div className="p-2 md:p-3 rounded-xl bg-gradient-to-br from-background/50 to-background/80 ring-1 ring-purple-500/30 transition-all duration-300 hover:scale-105">
+              <div className="grid grid-cols-4 gap-1.5 md:gap-2">
+                {[0, 1, 2, 3].map(row => 
+                  [0, 1, 2, 3].map(col => {
+                    const isHighlighted = row === currentRow && col === currentCol;
+                    return (
+                      <div
+                        key={`${row}-${col}`}
+                        className={cn(
+                          "w-10 h-10 md:w-12 md:h-12 flex items-center justify-center font-mono text-sm md:text-base font-semibold",
+                          "transition-all duration-300 rounded-md border",
+                          isHighlighted
+                            ? "bg-gradient-to-b from-purple-500/60 to-purple-500/40 border-purple-400 text-purple-100 ring-2 ring-purple-400 shadow-lg"
+                            : "bg-gradient-to-b from-purple-500/30 to-purple-500/10 border-purple-500/50 text-purple-300",
+                          "hover:brightness-125 cursor-default"
+                        )}
+                      >
+                        {stateHex[col][row]}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Enhanced Matrix Equation & Calculation */}
-      {!showComplete && (
-        <div className="bg-background/60 rounded-lg p-4 border border-purple-500/20">
-          <h6 className="text-sm text-purple-300 mb-4 text-center font-semibold">
-            Matrix Equation & Row {currentRow + 1} Galois Field Multiplication
-          </h6>
-          
-          <div className="flex flex-col lg:flex-row items-center justify-center gap-6 lg:gap-8">
-            {/* Left: Matrix Equation */}
-            <div className="flex items-center justify-center gap-4 flex-wrap">
+      {/* Enhanced Matrix Equation & Calculation - Always visible, loops */}
+      <div className="bg-background/60 rounded-xl p-4 border border-purple-500/20">
+        <h6 className="text-xs text-purple-300 mb-4 text-center font-semibold">
+          <span className="px-2 py-0.5 bg-purple-500/20 rounded-full border border-purple-400/30">
+            Column {currentCol + 1}, Row {currentRow + 1} - Galois Field
+          </span>
+        </h6>
+        
+        <div className="flex flex-col lg:flex-row items-center justify-center gap-4 lg:gap-6">
+          {/* Matrix Equation - Compact Tape Style */}
+          <div className="flex items-center justify-center gap-2">
               {/* Fixed Matrix */}
-              <div className="text-center">
-                <div className="text-xs text-muted-foreground mb-2">Fixed Matrix</div>
-                <div className="relative">
-                  {/* Matrix brackets */}
-                  <div className="absolute -left-2 top-0 h-full w-1 border-l-2 border-t-2 border-b-2 border-purple-400 rounded-l"></div>
-                  <div className="absolute -right-2 top-0 h-full w-1 border-r-2 border-t-2 border-b-2 border-purple-400 rounded-r"></div>
-                  
-                  <div className="grid grid-cols-4 gap-1 p-2">
+              <div className="flex flex-col items-center">
+                <div className="text-[10px] text-muted-foreground mb-1">Fixed</div>
+                <div className="px-2 py-2 rounded-l-lg bg-gradient-to-r from-purple-500/25 to-purple-500/10 border border-purple-500/30 border-r-0">
+                  <div className="grid grid-cols-4 gap-0.5">
                     {fixedMatrix.map((row, i) => (
                       row.map((val, j) => (
                         <div 
                           key={`${i}-${j}`} 
-                          className={`w-6 h-6 md:w-8 md:h-8 flex items-center justify-center font-mono text-xs md:text-sm font-semibold rounded border transition-all duration-500 ${
+                          className={cn(
+                            "w-6 h-6 md:w-7 md:h-7 flex items-center justify-center font-mono text-[10px] md:text-xs font-bold rounded border transition-all duration-300",
                             i === currentRow 
-                              ? 'text-purple-100 bg-purple-500/50 scale-110 shadow-lg border-purple-300 animate-pulse ring-2 ring-purple-400' 
+                              ? 'text-purple-100 bg-purple-500/50 border-purple-300 ring-1 ring-purple-400/50' 
                               : i < currentRow
-                              ? 'text-purple-200 bg-purple-500/30 border-purple-400'
+                              ? 'text-purple-200 bg-purple-500/25 border-purple-400/40'
                               : 'text-purple-400 bg-purple-500/10 border-purple-500/30'
-                          }`}
+                          )}
                         >
                           {val}
                         </div>
@@ -990,25 +1114,17 @@ function MixColumnsDiagram({ prevState, state }: { prevState: AESState; state: A
               </div>
               
               {/* Multiply symbol */}
-              <div className="text-2xl md:text-3xl text-purple-400 animate-pulse font-bold">×</div>
+              <div className="text-lg text-purple-400 font-bold">×</div>
               
               {/* Input Column */}
-              <div className="text-center">
-                <div className="text-xs text-muted-foreground mb-2">Input Column</div>
-                <div className="relative">
-                  {/* Matrix brackets */}
-                  <div className="absolute -left-2 top-0 h-full w-1 border-l-2 border-t-2 border-b-2 border-purple-400 rounded-l"></div>
-                  <div className="absolute -right-2 top-0 h-full w-1 border-r-2 border-t-2 border-b-2 border-purple-400 rounded-r"></div>
-                  
-                  <div className="flex flex-col gap-1 p-2">
+              <div className="flex flex-col items-center">
+                <div className="text-[10px] text-muted-foreground mb-1">Col {currentCol + 1}</div>
+                <div className="px-2 py-2 bg-gradient-to-r from-purple-500/10 via-purple-500/20 to-purple-500/10 border-y border-purple-500/30">
+                  <div className="flex flex-col gap-0.5">
                     {inputCol.map((val, idx) => (
                       <div 
                         key={idx} 
-                        className={`w-8 h-6 md:w-12 md:h-8 flex items-center justify-center font-mono text-xs md:text-sm font-semibold rounded border transition-all duration-300 ${
-                          currentCalculation.terms.some((term, termIdx) => termIdx === idx)
-                            ? 'text-purple-200 bg-purple-500/30 border-purple-400 scale-105'
-                            : 'text-purple-400 bg-purple-500/10 border-purple-500/30'
-                        }`}
+                        className="w-9 h-6 md:w-10 md:h-7 flex items-center justify-center font-mono text-[10px] md:text-xs font-bold rounded border text-purple-100 bg-purple-500/35 border-purple-400"
                       >
                         {val.toString(16).padStart(2, '0').toUpperCase()}
                       </div>
@@ -1018,27 +1134,24 @@ function MixColumnsDiagram({ prevState, state }: { prevState: AESState; state: A
               </div>
               
               {/* Equals symbol */}
-              <div className="text-2xl md:text-3xl text-purple-400 animate-pulse font-bold">=</div>
+              <div className="text-lg text-purple-400 font-bold">=</div>
               
               {/* Output Column */}
-              <div className="text-center">
-                <div className="text-xs text-muted-foreground mb-2">Result</div>
-                <div className="relative">
-                  {/* Matrix brackets */}
-                  <div className="absolute -left-2 top-0 h-full w-1 border-l-2 border-t-2 border-b-2 border-purple-400 rounded-l"></div>
-                  <div className="absolute -right-2 top-0 h-full w-1 border-r-2 border-t-2 border-b-2 border-purple-400 rounded-r"></div>
-                  
-                  <div className="flex flex-col gap-1 p-2">
+              <div className="flex flex-col items-center">
+                <div className="text-[10px] text-muted-foreground mb-1">Result</div>
+                <div className="px-2 py-2 rounded-r-lg bg-gradient-to-r from-purple-500/10 to-purple-500/30 border border-purple-500/40 border-l-0">
+                  <div className="flex flex-col gap-0.5">
                     {calculations.map((calc, idx) => (
                       <div 
                         key={idx} 
-                        className={`w-8 h-6 md:w-12 md:h-8 flex items-center justify-center font-mono text-xs md:text-sm font-bold rounded border transition-all duration-500 ${
+                        className={cn(
+                          "w-9 h-6 md:w-10 md:h-7 flex items-center justify-center font-mono text-[10px] md:text-xs font-bold rounded border transition-all duration-300",
                           idx === currentRow
-                            ? 'text-purple-100 bg-purple-500/60 border-purple-300 scale-125 shadow-lg animate-pulse ring-2 ring-purple-400'
+                            ? 'text-purple-100 bg-purple-500/60 border-purple-300 ring-1 ring-purple-400'
                             : idx < currentRow
-                            ? 'text-purple-200 bg-purple-500/40 border-purple-400'
+                            ? 'text-purple-200 bg-purple-500/35 border-purple-400'
                             : 'text-purple-400 bg-purple-500/10 border-purple-500/30'
-                        }`}
+                        )}
                       >
                         {calc.finalResult.toString(16).padStart(2, '0').toUpperCase()}
                       </div>
@@ -1046,73 +1159,67 @@ function MixColumnsDiagram({ prevState, state }: { prevState: AESState; state: A
                   </div>
                 </div>
               </div>
+          </div>
+
+          {/* Divider */}
+          <div className="hidden lg:block w-px h-24 bg-gradient-to-b from-transparent via-purple-500/30 to-transparent"></div>
+          <div className="lg:hidden w-1/2 h-px bg-gradient-to-r from-transparent via-purple-500/30 to-transparent"></div>
+
+          {/* Step-by-Step Calculation - Compact */}
+          <div className="flex-1 max-w-xs">
+            <div className="text-center mb-2">
+              <div className="text-[10px] font-semibold text-purple-200 px-2 py-1 bg-purple-500/15 rounded border border-purple-400/20 inline-block">
+                [{fixedMatrix[currentRow].join(', ')}] × col
+              </div>
             </div>
-
-            {/* Divider */}
-            <div className="hidden lg:block w-px h-32 bg-purple-500/30"></div>
-            <div className="lg:hidden w-full h-px bg-purple-500/30"></div>
-
-            {/* Right: Step-by-Step Calculation */}
-            <div className="flex-1 max-w-md">
-              <div className="text-center mb-3">
-                <div className="text-sm font-semibold text-purple-300 mb-1">Row {currentRow + 1} Calculation</div>
-                <div className="text-xs text-muted-foreground">
-                  [{fixedMatrix[currentRow].join(', ')}] × column
+            
+            {/* Multiplication terms - Compact grid */}
+            <div className="grid grid-cols-2 gap-1.5 mb-2">
+              {currentCalculation.terms.map((term, idx) => (
+                <div key={idx} className="flex items-center gap-1 p-1 rounded bg-background/30 border border-purple-500/15">
+                  <div className={cn(
+                    "px-1.5 py-0.5 rounded font-mono text-[10px] font-bold flex-shrink-0",
+                    term.coeff === 1 
+                      ? 'bg-green-500/40 text-green-100 border border-green-400/60' 
+                      : term.coeff === 2 
+                      ? 'bg-blue-500/40 text-blue-100 border border-blue-400/60'
+                      : 'bg-orange-500/40 text-orange-100 border border-orange-400/60'
+                  )}>
+                    {term.coeff}×{term.inputByte.toString(16).padStart(2, '0').toUpperCase()}
+                  </div>
+                  <span className="text-purple-400 text-xs">=</span>
+                  <div className="px-1.5 py-0.5 bg-purple-500/30 text-purple-100 border border-purple-400/60 rounded font-mono text-[10px] font-bold">
+                    {term.result.toString(16).padStart(2, '0').toUpperCase()}
+                  </div>
                 </div>
-              </div>
-              
-              {/* Multiplication terms - vertical compact layout */}
-              <div className="space-y-2 mb-4">
+              ))}
+            </div>
+            
+            {/* Final XOR - Compact */}
+            <div className="bg-purple-500/10 rounded-lg p-2 border border-purple-500/20">
+              <div className="flex items-center justify-center gap-1 flex-wrap font-mono">
                 {currentCalculation.terms.map((term, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    {/* Coefficient and Input */}
-                    <div className={`px-2 py-1 rounded font-mono text-xs font-bold transition-all duration-500 flex-shrink-0 ${
-                      term.coeff === 1 
-                        ? 'bg-green-500/40 text-green-100 border border-green-400' 
-                        : term.coeff === 2 
-                        ? 'bg-blue-500/40 text-blue-100 border border-blue-400'
-                        : 'bg-orange-500/40 text-orange-100 border border-orange-400'
-                    }`}>
-                      {term.coeff} × {term.inputByte.toString(16).padStart(2, '0').toUpperCase()}
-                    </div>
-                    
-                    <div className="text-purple-400">=</div>
-                    
-                    {/* Result */}
-                    <div className="px-2 py-1 bg-purple-500/30 text-purple-200 border border-purple-400 rounded font-mono text-xs font-bold flex-shrink-0">
+                  <span key={idx} className="flex items-center gap-1">
+                    <span className="px-1 py-0.5 rounded bg-purple-500/25 text-purple-200 text-[10px] font-bold">
                       {term.result.toString(16).padStart(2, '0').toUpperCase()}
-                    </div>
-                  </div>
+                    </span>
+                    {idx < currentCalculation.terms.length - 1 && (
+                      <span className="text-purple-400 text-xs font-bold">⊕</span>
+                    )}
+                  </span>
                 ))}
-              </div>
-              
-              {/* Final XOR calculation */}
-              <div className="bg-background/30 rounded p-3">
-                <div className="text-center mb-2">
-                  <div className="text-xs text-muted-foreground mb-1">XOR all results:</div>
-                  <div className="flex items-center justify-center gap-1 flex-wrap">
-                    {currentCalculation.terms.map((term, idx) => (
-                      <span key={idx} className="text-xs font-mono text-purple-300">
-                        {term.result.toString(16).padStart(2, '0').toUpperCase()}
-                        {idx < currentCalculation.terms.length - 1 ? ' ⊕ ' : ''}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-xs text-muted-foreground">Result:</div>
-                  <div className="text-lg font-mono font-bold text-purple-200 animate-pulse">
-                    {currentCalculation.finalResult.toString(16).padStart(2, '0').toUpperCase()}
-                  </div>
-                </div>
+                <span className="text-purple-400 text-sm font-bold mx-1">=</span>
+                <span className="px-2 py-0.5 rounded bg-purple-500/40 text-purple-100 text-xs font-bold border border-purple-300 ring-1 ring-purple-400/50">
+                  {currentCalculation.finalResult.toString(16).padStart(2, '0').toUpperCase()}
+                </span>
               </div>
             </div>
           </div>
         </div>
-      )}
+      </div>
       
       <p className="text-xs text-muted-foreground text-center bg-background/50 rounded-lg p-3">
-        <span className="text-purple-300 font-semibold">Auto-cycling:</span> Each row is multiplied with the fixed matrix using Galois Field arithmetic
+        <span className="text-purple-300 font-semibold">Auto-cycling:</span> Loops through all 4 columns × 4 rows using Galois Field arithmetic
       </p>
     </div>
   );
@@ -1122,127 +1229,412 @@ function AddRoundKeyDiagram({ prevState, state, roundKey }: { prevState: AESStat
   const prevHex = stateToHex(prevState);
   const currHex = stateToHex(state);
   const keyHex = roundKey ? stateToHex(roundKey) : null;
+  
+  const [currentCell, setCurrentCell] = useState({ row: 0, col: 0 });
+  
+  // Auto-cycle through cells
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentCell(prev => {
+        const nextCol = prev.col + 1;
+        if (nextCol >= 4) {
+          const nextRow = (prev.row + 1) % 4;
+          return { row: nextRow, col: 0 };
+        }
+        return { row: prev.row, col: nextCol };
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
-    <div className="rounded-xl p-6 space-y-6 border border-green-500/30 shadow-lg">
+    <div className="rounded-xl p-4 space-y-4 border border-green-500/30 shadow-lg">
       <h4 className="font-bold text-green-400 text-center text-sm">AddRoundKey Operation</h4>
       
-      <div className="flex flex-col lg:flex-row items-center justify-center gap-4 lg:gap-6">
-        {/* State Matrix */}
+      {/* Horizontal Layout: State ⊕ Key = Result (full matrices, no background) */}
+      <div className="flex flex-col lg:flex-row items-center justify-center gap-3 lg:gap-4">
+        {/* State Matrix - Highlight current cell */}
         <div className="animate-in fade-in slide-in-from-left-4 duration-500">
-          <StateMatrix 
-            state={prevState} 
-            label="State" 
-            colorClass="bg-green-500/10 text-green-400 border-green-500"
-          />
+          <div className="flex flex-col items-center group">
+            <div className="text-xs font-medium text-muted-foreground mb-2">State</div>
+            <div className="p-2 md:p-3 rounded-xl bg-gradient-to-br from-background/50 to-background/80 ring-1 ring-border/50 transition-all duration-300 hover:scale-105">
+              <div className="grid grid-cols-4 gap-1.5 md:gap-2">
+                {[0, 1, 2, 3].map(row => 
+                  [0, 1, 2, 3].map(col => {
+                    const isActive = row === currentCell.row && col === currentCell.col;
+                    return (
+                      <div
+                        key={`state-${row}-${col}`}
+                        className={cn(
+                          "w-10 h-10 md:w-12 md:h-12 flex items-center justify-center font-mono text-sm md:text-base font-semibold",
+                          "transition-all duration-300 rounded-md border",
+                          isActive
+                            ? "bg-gradient-to-b from-green-500/50 to-green-500/30 border-green-400 text-green-100 ring-2 ring-green-400/60 shadow-lg"
+                            : "bg-gradient-to-b from-muted/40 to-muted/20 border-border/50 text-foreground/70",
+                          "hover:brightness-125 cursor-default"
+                        )}
+                      >
+                        {prevHex[col][row]}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
         </div>
         
         {/* XOR Symbol */}
-        <div className="flex flex-col items-center gap-2 animate-in zoom-in duration-300 delay-100">
-          <div className="text-3xl lg:text-4xl text-green-400 animate-pulse font-bold">⊕</div>
-          <div className="text-xs bg-green-500/20 px-2 py-1 rounded-full text-green-300 font-semibold">XOR</div>
+        <div className="flex flex-col items-center gap-1 animate-in zoom-in duration-300 delay-100">
+          <div className="text-2xl lg:text-3xl text-green-400 font-bold">⊕</div>
+          <div className="text-[10px] bg-green-500/20 px-1.5 py-0.5 rounded-full text-green-300 font-medium">XOR</div>
         </div>
         
-        {/* Round Key Matrix */}
+        {/* Round Key Matrix - Full yellow highlight */}
         <div className="animate-in fade-in zoom-in duration-300 delay-150">
-          <StateMatrix 
-            state={roundKey || [
-              [0, 0, 0, 0],
-              [0, 0, 0, 0], 
-              [0, 0, 0, 0],
-              [0, 0, 0, 0]
-            ]} 
-            label="Round Key" 
-            colorClass="bg-yellow-500/15 text-yellow-300 border-yellow-400"
-          />
+          <div className="flex flex-col items-center group">
+            <div className="text-xs font-medium text-muted-foreground mb-2">Round Key</div>
+            <div className="p-2 md:p-3 rounded-xl bg-gradient-to-br from-background/50 to-background/80 ring-1 ring-yellow-500/40 transition-all duration-300 hover:scale-105">
+              <div className="grid grid-cols-4 gap-1.5 md:gap-2">
+                {[0, 1, 2, 3].map(row => 
+                  [0, 1, 2, 3].map(col => {
+                    const isActive = row === currentCell.row && col === currentCell.col;
+                    return (
+                      <div
+                        key={`key-${row}-${col}`}
+                        className={cn(
+                          "w-10 h-10 md:w-12 md:h-12 flex items-center justify-center font-mono text-sm md:text-base font-semibold",
+                          "transition-all duration-300 rounded-md border",
+                          isActive
+                            ? "bg-gradient-to-b from-yellow-500/60 to-yellow-500/40 border-yellow-400 text-yellow-100 ring-2 ring-yellow-400/60 shadow-lg"
+                            : "bg-gradient-to-b from-yellow-500/30 to-yellow-500/10 border-yellow-500/50 text-yellow-300",
+                          "hover:brightness-125 cursor-default"
+                        )}
+                      >
+                        {keyHex ? keyHex[col][row] : "00"}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
         </div>
         
         {/* Equals Symbol */}
-        <div className="text-2xl lg:text-3xl text-green-400 animate-pulse font-bold">=</div>
+        <div className="text-xl lg:text-2xl text-green-400 font-bold">=</div>
         
-        {/* Result Matrix */}
+        {/* Result Matrix - Highlight current cell */}
         <div className="animate-in fade-in slide-in-from-right-4 duration-500 delay-200">
-          <StateMatrix 
-            state={state} 
-            label="Result" 
-            highlight
-            colorClass="bg-green-500/20 text-green-200 border-green-400"
-          />
+          <div className="flex flex-col items-center group">
+            <div className="text-xs font-medium text-muted-foreground mb-2">Result</div>
+            <div className="p-2 md:p-3 rounded-xl bg-gradient-to-br from-background/50 to-background/80 ring-1 ring-green-500/30 transition-all duration-300 hover:scale-105">
+              <div className="grid grid-cols-4 gap-1.5 md:gap-2">
+                {[0, 1, 2, 3].map(row => 
+                  [0, 1, 2, 3].map(col => {
+                    const isActive = row === currentCell.row && col === currentCell.col;
+                    return (
+                      <div
+                        key={`result-${row}-${col}`}
+                        className={cn(
+                          "w-10 h-10 md:w-12 md:h-12 flex items-center justify-center font-mono text-sm md:text-base font-semibold",
+                          "transition-all duration-300 rounded-md border",
+                          isActive
+                            ? "bg-gradient-to-b from-green-500/70 to-green-500/50 border-green-400 text-green-100 ring-2 ring-green-400 shadow-lg"
+                            : "bg-gradient-to-b from-green-500/30 to-green-500/10 border-green-500/50 text-green-300",
+                          "hover:brightness-125 cursor-default"
+                        )}
+                      >
+                        {currHex[col][row]}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* XOR Details Section */}
-      <div className="bg-background/60 rounded-lg p-4 border border-green-500/20">
-        <h6 className="text-sm text-green-300 mb-4 text-center font-semibold">
-          XOR Operation Details (A D D R O U N D K E Y)
+      {/* Caesar-style XOR Step Visualization */}
+      <div className="bg-background/60 rounded-xl p-4 border border-green-500/20">
+        <h6 className="text-xs text-green-300 mb-4 text-center font-semibold">
+          <span className="px-2 py-0.5 bg-green-500/20 rounded-full border border-green-400/30">
+            Cell [{currentCell.row + 1}, {currentCell.col + 1}] XOR Step
+          </span>
         </h6>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[0, 1, 2, 3].map(row => 
-            [0, 1, 2, 3].map(col => {
-              const stateVal = prevHex[col][row];
-              const keyVal = keyHex ? keyHex[col][row] : "00";
-              const resultVal = currHex[col][row];
-              const position = `[${row}][${col}]`;
-              
-              return (
-                <div key={`${row}-${col}`} className="p-3 rounded-lg border border-green-500/30 bg-green-500/10">
-                  <div className="text-xs font-semibold text-green-300 mb-2">
-                    Position {position}
-                  </div>
-                  
-                  <div className="flex items-center gap-2 justify-center">
-                    {/* State Value */}
-                    <div className="text-center">
-                      <div className="text-xs text-muted-foreground mb-1">State</div>
-                      <div className="h-8 w-12 flex items-center justify-center font-mono text-sm font-semibold rounded border bg-green-500/20 text-green-300 border-green-500/40">
-                        {stateVal}
-                      </div>
-                      <div className="text-xs text-green-400 mt-1">
-                        {parseInt(stateVal, 16).toString(2).padStart(8, '0')}
-                      </div>
-                    </div>
-                    
-                    <div className="text-green-400 text-lg">⊕</div>
-                    
-                    {/* Key Value */}
-                    <div className="text-center">
-                      <div className="text-xs text-muted-foreground mb-1">Key</div>
-                      <div className="h-8 w-12 flex items-center justify-center font-mono text-sm font-semibold rounded border bg-green-500/30 text-green-200 border-green-400">
-                        {keyVal}
-                      </div>
-                      <div className="text-xs text-green-400 mt-1">
-                        {parseInt(keyVal, 16).toString(2).padStart(8, '0')}
-                      </div>
-                    </div>
-                    
-                    <div className="text-green-400 text-lg">=</div>
-                    
-                    {/* Result Value */}
-                    <div className="text-center">
-                      <div className="text-xs text-muted-foreground mb-1">Result</div>
-                      <div className="h-8 w-12 flex items-center justify-center font-mono text-sm font-bold rounded border bg-green-500/40 text-green-100 border-green-400 shadow-md">
-                        {resultVal}
-                      </div>
-                      <div className="text-xs text-green-400 mt-1">
-                        {parseInt(resultVal, 16).toString(2).padStart(8, '0')}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="text-xs text-center text-muted-foreground mt-2 bg-background/30 rounded p-1">
-                    {stateVal} ⊕ {keyVal} = {resultVal}
-                  </div>
-                </div>
-              );
-            })
-          )}
+        {/* Caesar-style vertical step: Value (decimal) ⊕ Key (decimal) = Result (decimal) */}
+        <div className="flex items-center justify-center gap-4">
+          {/* State byte */}
+          <div className="flex flex-col items-center">
+            <div className="w-14 h-14 md:w-16 md:h-16 flex items-center justify-center font-mono text-lg md:text-xl font-bold rounded-lg border-2 bg-green-500/30 border-green-400 text-green-100 shadow-lg">
+              {prevHex[currentCell.col][currentCell.row]}
+            </div>
+            <div className="text-sm text-green-400/80 font-mono mt-1">
+              ({parseInt(prevHex[currentCell.col][currentCell.row], 16)})
+            </div>
+          </div>
+          
+          {/* XOR Symbol */}
+          <div className="flex flex-col items-center">
+            <div className="text-2xl text-green-400 font-bold">⊕</div>
+          </div>
+          
+          {/* Key byte */}
+          <div className="flex flex-col items-center">
+            <div className="w-14 h-14 md:w-16 md:h-16 flex items-center justify-center font-mono text-lg md:text-xl font-bold rounded-lg border-2 bg-yellow-500/30 border-yellow-400 text-yellow-100 shadow-lg">
+              {keyHex ? keyHex[currentCell.col][currentCell.row] : "00"}
+            </div>
+            <div className="text-sm text-yellow-400/80 font-mono mt-1">
+              ({keyHex ? parseInt(keyHex[currentCell.col][currentCell.row], 16) : 0})
+            </div>
+          </div>
+          
+          {/* Equals Symbol */}
+          <div className="flex flex-col items-center">
+            <div className="text-2xl text-green-400 font-bold">=</div>
+          </div>
+          
+          {/* Result byte */}
+          <div className="flex flex-col items-center">
+            <div className="w-14 h-14 md:w-16 md:h-16 flex items-center justify-center font-mono text-lg md:text-xl font-bold rounded-lg border-2 bg-green-500/50 border-green-400 text-green-100 ring-2 ring-green-400/50 shadow-lg">
+              {currHex[currentCell.col][currentCell.row]}
+            </div>
+            <div className="text-sm text-green-300 font-mono mt-1">
+              ({parseInt(currHex[currentCell.col][currentCell.row], 16)})
+            </div>
+          </div>
+        </div>
+
+        {/* Binary breakdown */}
+        <div className="mt-4 bg-background/40 rounded-lg px-3 py-2 text-center">
+          <div className="text-[10px] text-muted-foreground mb-1">Binary XOR</div>
+          <div className="flex items-center justify-center gap-2 font-mono text-xs">
+            <span className="text-green-300">{parseInt(prevHex[currentCell.col][currentCell.row], 16).toString(2).padStart(8, '0')}</span>
+            <span className="text-green-400 font-bold">⊕</span>
+            <span className="text-yellow-300">{keyHex ? parseInt(keyHex[currentCell.col][currentCell.row], 16).toString(2).padStart(8, '0') : '00000000'}</span>
+            <span className="text-muted-foreground">=</span>
+            <span className="text-green-100 font-bold">{parseInt(currHex[currentCell.col][currentCell.row], 16).toString(2).padStart(8, '0')}</span>
+          </div>
         </div>
       </div>
       
-      <p className="text-xs text-muted-foreground text-center bg-background/50 rounded-lg p-3">
-        <span className="text-green-300 font-semibold">XOR (⊕):</span> Each bit is XORed independently. Binary representations show the bitwise operation for each byte.
+      <p className="text-xs text-muted-foreground text-center bg-background/50 rounded-lg p-2">
+        <span className="text-green-300 font-semibold">Auto-cycling:</span> XOR each state byte with round key byte
       </p>
+    </div>
+  );
+}
+
+// Key Expansion Diagram Component - Visualize all 11 round keys with schedule algorithm
+function KeyExpansionDiagram({ roundKeys, originalKey }: { roundKeys: AESState[]; originalKey: string }) {
+  const [selectedRound, setSelectedRound] = useState(0);
+  
+  // Convert state to hex
+  const stateToHex = (state: AESState) => 
+    state.map(col => col.map(byte => byte.toString(16).padStart(2, '0').toUpperCase()));
+  
+  // Get original key bytes
+  const keyBytes = new Array(16).fill(0);
+  for (let i = 0; i < Math.min(originalKey.length, 16); i++) {
+    keyBytes[i] = originalKey.charCodeAt(i);
+  }
+  
+  // Calculate all 44 words (W0-W43) for the schedule diagram
+  const words: number[][] = [];
+  for (let i = 0; i < 4; i++) {
+    words.push([keyBytes[i * 4], keyBytes[i * 4 + 1], keyBytes[i * 4 + 2], keyBytes[i * 4 + 3]]);
+  }
+  for (let i = 4; i < 44; i++) {
+    let temp = [...words[i - 1]];
+    if (i % 4 === 0) {
+      temp = [temp[1], temp[2], temp[3], temp[0]];
+      temp = temp.map(b => SBOX[b]);
+      temp[0] ^= RCON[(i / 4) - 1];
+    }
+    words.push(words[i - 4].map((b, j) => b ^ temp[j]));
+  }
+  
+  const selectedKeyHex = stateToHex(roundKeys[selectedRound]);
+  
+  // Word to hex string helper
+  const wordToHex = (word: number[]) => word.map(b => b.toString(16).padStart(2, '0').toUpperCase()).join('');
+  
+  // Get g() transformed word
+  const getGWord = (wordIdx: number) => {
+    if (wordIdx < 1) return words[0];
+    let temp = [...words[wordIdx]];
+    temp = [temp[1], temp[2], temp[3], temp[0]]; // RotWord
+    temp = temp.map(b => SBOX[b]); // SubWord
+    temp[0] ^= RCON[Math.floor((wordIdx + 1) / 4) - 1]; // Rcon
+    return temp;
+  };
+  
+  return (
+    <div className="rounded-xl p-4 space-y-4 border border-yellow-500/30">
+      <h4 className="font-bold text-yellow-400 text-center text-sm">Key Expansion (AES-128)</h4>
+      
+      {/* Original Key Tape → W0-W3 */}
+      <div className="flex flex-col items-center">
+        <div className="text-xs font-medium text-muted-foreground mb-2">Original Key → W₀W₁W₂W₃</div>
+        <div className="flex items-center">
+          {[0, 1, 2, 3].map(wordIdx => (
+            <div key={wordIdx} className="flex items-center">
+              {words[wordIdx].map((byte, byteIdx) => (
+                <div 
+                  key={`${wordIdx}-${byteIdx}`} 
+                  className={cn(
+                    "w-7 h-9 md:w-8 md:h-10 flex items-center justify-center font-mono text-[10px] md:text-xs font-semibold border-y border-l bg-gradient-to-b from-yellow-500/30 to-yellow-500/10 border-yellow-500/50 text-yellow-300",
+                    wordIdx === 0 && byteIdx === 0 && "rounded-l-lg",
+                    wordIdx === 3 && byteIdx === 3 && "rounded-r-lg border-r",
+                    selectedRound === 0 && "ring-1 ring-yellow-400/50"
+                  )}
+                >
+                  {byte.toString(16).padStart(2, '0').toUpperCase()}
+                </div>
+              ))}
+              {wordIdx < 3 && <div className="w-px h-6 bg-yellow-500/40 mx-0.5" />}
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {/* Round Key Selector */}
+      <div className="space-y-2">
+        <div className="text-xs font-medium text-center text-muted-foreground">Select Round Key</div>
+        <div className="flex items-center justify-center gap-1 flex-wrap">
+          {roundKeys.map((_, round) => (
+            <button
+              key={round}
+              onClick={() => setSelectedRound(round)}
+              className={cn(
+                "w-8 h-8 md:w-9 md:h-9 flex items-center justify-center font-mono text-xs font-semibold rounded-lg border transition-all duration-200",
+                selectedRound === round
+                  ? "bg-gradient-to-b from-yellow-500/60 to-yellow-500/40 border-yellow-400 text-yellow-100 ring-2 ring-yellow-400/60 shadow-lg scale-110"
+                  : "bg-gradient-to-b from-yellow-500/20 to-yellow-500/5 border-yellow-500/30 text-yellow-400/70 hover:bg-yellow-500/30 hover:scale-105"
+              )}
+            >
+              K{round}
+            </button>
+          ))}
+        </div>
+      </div>
+      
+      {/* Dynamic Algorithm Section based on selected round */}
+      <div className="rounded-xl p-3 border border-yellow-500/20 space-y-3">
+        <div className="text-xs text-center text-yellow-400 font-semibold">
+          {selectedRound === 0 ? "K₀ = Original Key (W₀W₁W₂W₃)" : `Computing K${selectedRound} (W${selectedRound * 4} to W${selectedRound * 4 + 3})`}
+        </div>
+        
+        {selectedRound > 0 && (
+          <div className="space-y-3">
+            {/* Show computation for each word in the selected round key */}
+            {[0, 1, 2, 3].map(wordOffset => {
+              const wordIdx = selectedRound * 4 + wordOffset;
+              const isGFunction = wordIdx % 4 === 0;
+              const prevWord = words[wordIdx - 1];
+              const prevPrevWord = words[wordIdx - 4];
+              const resultWord = words[wordIdx];
+              
+              return (
+                <div key={wordOffset} className={cn(
+                  "p-2 rounded-lg border transition-all",
+                  isGFunction ? "bg-orange-500/5 border-orange-500/30" : "bg-blue-500/5 border-blue-500/30"
+                )}>
+                  <div className="flex items-center justify-center gap-2 flex-wrap">
+                    {/* W[i-4] */}
+                    <div className="flex flex-col items-center">
+                      <span className="text-[8px] text-muted-foreground">W{wordIdx - 4}</span>
+                      <div className="flex">
+                        {prevPrevWord.map((b, i) => (
+                          <div key={i} className="w-5 h-6 flex items-center justify-center font-mono text-[8px] font-semibold bg-blue-500/20 border border-blue-500/40 text-blue-300 first:rounded-l last:rounded-r">
+                            {b.toString(16).padStart(2, '0').toUpperCase()}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <span className="text-lg text-yellow-400 font-bold">⊕</span>
+                    
+                    {/* W[i-1] or g(W[i-1]) */}
+                    <div className="flex flex-col items-center">
+                      <span className={cn("text-[8px]", isGFunction ? "text-orange-400" : "text-muted-foreground")}>
+                        {isGFunction ? `g(W${wordIdx - 1})` : `W${wordIdx - 1}`}
+                      </span>
+                      <div className="flex">
+                        {(isGFunction ? getGWord(wordIdx - 1) : prevWord).map((b, i) => (
+                          <div key={i} className={cn(
+                            "w-5 h-6 flex items-center justify-center font-mono text-[8px] font-semibold border first:rounded-l last:rounded-r",
+                            isGFunction 
+                              ? "bg-orange-500/20 border-orange-500/40 text-orange-300"
+                              : "bg-purple-500/20 border-purple-500/40 text-purple-300"
+                          )}>
+                            {b.toString(16).padStart(2, '0').toUpperCase()}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <span className="text-lg text-muted-foreground">=</span>
+                    
+                    {/* Result W[i] */}
+                    <div className="flex flex-col items-center">
+                      <span className="text-[8px] text-yellow-400 font-semibold">W{wordIdx}</span>
+                      <div className="flex">
+                        {resultWord.map((b, i) => (
+                          <div key={i} className="w-5 h-6 flex items-center justify-center font-mono text-[8px] font-bold bg-yellow-500/30 border border-yellow-400 text-yellow-200 first:rounded-l last:rounded-r">
+                            {b.toString(16).padStart(2, '0').toUpperCase()}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* g function detail when applicable */}
+                  {isGFunction && (
+                    <div className="mt-2 pt-2 border-t border-orange-500/20 flex items-center justify-center gap-2 flex-wrap text-[8px]">
+                      <span className="text-orange-400 font-semibold">g():</span>
+                      <span className="px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-300">RotWord</span>
+                      <span className="text-muted-foreground">→</span>
+                      <span className="px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-300">SubWord</span>
+                      <span className="text-muted-foreground">→</span>
+                      <span className="px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-300">⊕ Rcon[{selectedRound - 1}]</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        
+        {selectedRound === 0 && (
+          <div className="text-[10px] text-center text-muted-foreground">
+            The first round key K₀ is simply the original 128-bit key
+          </div>
+        )}
+      </div>
+      
+      {/* Selected Round Key Matrix */}
+      <div className="flex flex-col items-center">
+        <div className="text-xs font-medium text-yellow-400 mb-2">
+          Round Key {selectedRound} = W{selectedRound * 4} | W{selectedRound * 4 + 1} | W{selectedRound * 4 + 2} | W{selectedRound * 4 + 3}
+        </div>
+        <div className="p-2 md:p-3 rounded-xl ring-1 ring-yellow-500/40">
+          <div className="grid grid-cols-4 gap-1.5 md:gap-2">
+            {[0, 1, 2, 3].map(row => 
+              [0, 1, 2, 3].map(col => (
+                <div
+                  key={`${row}-${col}`}
+                  className="w-10 h-10 md:w-12 md:h-12 flex flex-col items-center justify-center font-mono text-sm md:text-base font-semibold rounded-md border bg-gradient-to-b from-yellow-500/40 to-yellow-500/20 border-yellow-500/60 text-yellow-200 hover:brightness-125 cursor-default"
+                >
+                  <span>{selectedKeyHex[col][row]}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1326,6 +1718,7 @@ export default function AESCipher() {
       title="AES Encryption"
       description="Advanced Encryption Standard - 128-bit block cipher"
     >
+      
       <div className="w-full space-y-4">
         {/* Top Row - 2 columns: Controls + Step Navigation */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1640,24 +2033,26 @@ export default function AESCipher() {
               </Button>
             </div>
 
-            {/* Legend */}
+            {/* Legend - Tape Style */}
             <div className="pt-4 border-t border-border">
-              <div className="flex flex-wrap gap-3 text-xs">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded bg-orange-400" />
-                  <span className="text-muted-foreground">SubBytes</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded bg-blue-400" />
-                  <span className="text-muted-foreground">ShiftRows</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded bg-purple-400" />
-                  <span className="text-muted-foreground">MixColumns</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded bg-green-400" />
-                  <span className="text-muted-foreground">AddRoundKey</span>
+              <div className="flex items-center justify-center">
+                <div className="flex gap-0">
+                  <div className="flex items-center gap-1 px-2 py-1 border-y border-l rounded-l-md bg-gradient-to-b from-orange-500/20 to-orange-500/5 border-orange-500/40">
+                    <div className="w-2 h-2 rounded-full bg-orange-400" />
+                    <span className="text-[10px] text-orange-400 font-medium">SubBytes</span>
+                  </div>
+                  <div className="flex items-center gap-1 px-2 py-1 border-y bg-gradient-to-b from-blue-500/20 to-blue-500/5 border-blue-500/40">
+                    <div className="w-2 h-2 rounded-full bg-blue-400" />
+                    <span className="text-[10px] text-blue-400 font-medium">ShiftRows</span>
+                  </div>
+                  <div className="flex items-center gap-1 px-2 py-1 border-y bg-gradient-to-b from-purple-500/20 to-purple-500/5 border-purple-500/40">
+                    <div className="w-2 h-2 rounded-full bg-purple-400" />
+                    <span className="text-[10px] text-purple-400 font-medium">MixColumns</span>
+                  </div>
+                  <div className="flex items-center gap-1 px-2 py-1 border-y border-r rounded-r-md bg-gradient-to-b from-green-500/20 to-green-500/5 border-green-500/40">
+                    <div className="w-2 h-2 rounded-full bg-green-400" />
+                    <span className="text-[10px] text-green-400 font-medium">AddRoundKey</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1785,36 +2180,79 @@ export default function AESCipher() {
                   <div className="space-y-4">
                     {/* Special visualization for Block to State */}
                     {currentStep.name === "Block to State" ? (
-                      <div className="space-y-4">
-                        <div className="text-center">
-                          <h4 className="text-sm font-semibold text-primary mb-4">Input Block (16 bytes)</h4>
-                          <div className="flex justify-center">
-                            <div className="grid grid-cols-8 gap-1 max-w-lg">
-                              {currentStep.state.flat().map((byte, i) => (
-                                <div key={i} className="h-8 w-8 md:h-10 md:w-10 flex items-center justify-center bg-muted/50 border border-muted rounded text-xs md:text-sm font-mono font-semibold">
-                                  {byte.toString(16).padStart(2, '0').toUpperCase()}
-                                </div>
-                              ))}
+                      <div className="rounded-xl p-4 space-y-4 border border-primary/30 shadow-lg">
+                        <h4 className="font-bold text-primary text-center text-sm">Block to State Conversion</h4>
+                        
+                        {/* Horizontal Layout: Input Block Tape → State Matrix */}
+                        <div className="flex flex-col items-center justify-center gap-6">
+                          {/* Input Block - Horizontal Tape */}
+                          <div className="animate-in fade-in slide-in-from-top-4 duration-500">
+                            <div className="flex flex-col items-center">
+                              <div className="text-xs font-medium text-muted-foreground mb-2">Input Block (16 bytes)</div>
+                              <div className="flex items-center">
+                                {currentStep.state.flat().map((byte, i) => (
+                                  <div 
+                                    key={i} 
+                                    className={cn(
+                                      "w-8 h-10 md:w-10 md:h-12 flex flex-col items-center justify-center font-mono text-xs md:text-sm font-semibold transition-all duration-300 border-y border-l bg-gradient-to-b from-muted/40 to-muted/20 border-border/50 text-foreground/70 hover:brightness-125 cursor-default",
+                                      i === 0 && "rounded-l-lg",
+                                      i === 15 && "rounded-r-lg border-r"
+                                    )}
+                                  >
+                                    <span>{byte.toString(16).padStart(2, '0').toUpperCase()}</span>
+                                    <span className="text-[7px] text-muted-foreground/60">{i}</span>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-3">Byte position: 0-15</p>
-                        </div>
-
-                        <div className="flex items-center justify-center">
-                          <div className="text-3xl text-primary animate-pulse">↓</div>
-                        </div>
-
-                        <div className="text-center">
-                          <h4 className="text-sm font-semibold text-primary mb-4">State Matrix (4×4, Column-Major)</h4>
-                          <div className="inline-block">
-                            <StateMatrix 
-                              state={currentStep.state} 
-                              label="" 
-                              colorClass="bg-primary/10 text-primary border-primary"
-                              highlight={true}
-                            />
+                          
+                          {/* Arrow pointing down */}
+                          <div className="flex flex-col items-center gap-1 animate-in zoom-in duration-300 delay-100">
+                            <div className="text-2xl text-primary font-bold">↓</div>
+                            <div className="text-[10px] bg-primary/20 px-2 py-0.5 rounded-full text-primary font-medium">Column-Major</div>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-3">Column-major: Col 0 → bytes 0,4,8,12 | Col 1 → bytes 1,5,9,13 | etc.</p>
+                          
+                          {/* State Matrix - After */}
+                          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-200">
+                            <div className="flex flex-col items-center group">
+                              <div className="text-xs font-medium text-muted-foreground mb-2">State Matrix (4×4)</div>
+                              <div className="p-2 md:p-3 rounded-xl bg-gradient-to-br from-background/50 to-background/80 ring-1 ring-primary/30 transition-all duration-300 hover:scale-105">
+                                <div className="grid grid-cols-4 gap-1.5 md:gap-2">
+                                  {[0, 1, 2, 3].map(row => 
+                                    [0, 1, 2, 3].map(col => {
+                                      const byte = currentStep.state[col][row];
+                                      const linearIdx = col * 4 + row;
+                                      return (
+                                        <div
+                                          key={`${row}-${col}`}
+                                          className="w-10 h-10 md:w-12 md:h-12 flex flex-col items-center justify-center font-mono text-sm md:text-base font-semibold transition-all duration-300 rounded-md border bg-gradient-to-b from-primary/30 to-primary/10 border-primary/50 text-primary hover:brightness-125 cursor-default"
+                                        >
+                                          <span>{byte.toString(16).padStart(2, '0').toUpperCase()}</span>
+                                          <span className="text-[8px] text-primary/60">{linearIdx}</span>
+                                        </div>
+                                      );
+                                    })
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Mapping explanation tape */}
+                        <div className="bg-background/60 rounded-xl p-3 border border-primary/20">
+                          <h6 className="text-xs text-primary mb-2 text-center font-semibold">Column-Major Mapping</h6>
+                          <div className="flex items-center justify-center gap-2 flex-wrap">
+                            {[0, 1, 2, 3].map(col => (
+                              <div key={col} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-primary/10 border border-primary/20">
+                                <span className="text-[10px] text-primary font-semibold">Col {col}:</span>
+                                <span className="text-[10px] text-muted-foreground font-mono">
+                                  [{col * 4},{col * 4 + 1},{col * 4 + 2},{col * 4 + 3}]
+                                </span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     ) : currentStep.operation === "subbytes" ? (
@@ -1829,6 +2267,9 @@ export default function AESCipher() {
                     ) : currentStep.operation === "addroundkey" && currentStep.roundKey ? (
                       /* AddRoundKey gets special integrated visualization */
                       <AddRoundKeyDiagram prevState={currentStep.prevState} state={currentStep.state} roundKey={currentStep.roundKey} />
+                    ) : currentStep.operation === "keyexpansion" && currentStep.roundKeys ? (
+                      /* Key Expansion gets special integrated visualization */
+                      <KeyExpansionDiagram roundKeys={currentStep.roundKeys} originalKey={key} />
                     ) : (
                       /* Normal state visualization for other operations */
                       <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6">
@@ -1861,31 +2302,28 @@ export default function AESCipher() {
                     <p className="text-xs text-muted-foreground text-center">
                       {currentStep?.description}
                     </p>
-
-                    {/* No more operation-specific detailed diagrams - all are integrated */}
                   </div>
                 )}
 
-                {/* AES Round Structure */}
+                {/* AES Round Structure - Tape Design */}
                 <div className="pt-4 border-t border-border">
-                  <h4 className="text-sm font-semibold text-foreground mb-3">Round Structure</h4>
-                  <div className="flex items-center justify-center gap-1 flex-wrap text-xs">
-                    <div className="px-1.5 py-0.5 rounded bg-muted text-foreground">Input</div>
-                    <span className="text-muted-foreground">→</span>
-                    <div className="px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">Add</div>
-                    <span className="text-muted-foreground">→</span>
-                    <div className="border border-dashed border-muted-foreground rounded px-1.5 py-0.5 flex items-center gap-0.5">
-                      <span className="text-muted-foreground">×9:</span>
-                      <span className="text-orange-400">S</span>
-                      <span className="text-blue-400">R</span>
-                      <span className="text-purple-400">M</span>
-                      <span className="text-green-400">A</span>
-                    </div>
-                    <span className="text-muted-foreground">→</span>
-                    <div className="border border-primary rounded px-1.5 py-0.5 flex items-center gap-0.5">
-                      <span className="text-orange-400">S</span>
-                      <span className="text-blue-400">R</span>
-                      <span className="text-green-400">A</span>
+                  <h4 className="text-xs font-semibold text-muted-foreground mb-2 text-center">Round Structure</h4>
+                  <div className="flex items-center justify-center">
+                    <div className="flex items-center gap-0">
+                      <div className="px-2 py-1 border-y border-l rounded-l-md bg-gradient-to-b from-muted/30 to-muted/10 border-border text-[10px] font-medium">Input</div>
+                      <div className="px-2 py-1 border-y bg-gradient-to-b from-green-500/20 to-green-500/5 border-green-500/40 text-[10px] text-green-400 font-medium">Add</div>
+                      <div className="px-2 py-1 border-y bg-gradient-to-b from-muted/20 to-muted/5 border-border flex items-center gap-0.5">
+                        <span className="text-[9px] text-muted-foreground">×9:</span>
+                        <span className="text-[10px] text-orange-400 font-bold">S</span>
+                        <span className="text-[10px] text-blue-400 font-bold">R</span>
+                        <span className="text-[10px] text-purple-400 font-bold">M</span>
+                        <span className="text-[10px] text-green-400 font-bold">A</span>
+                      </div>
+                      <div className="px-2 py-1 border-y border-r rounded-r-md bg-gradient-to-b from-primary/20 to-primary/5 border-primary/50 flex items-center gap-0.5">
+                        <span className="text-[10px] text-orange-400 font-bold">S</span>
+                        <span className="text-[10px] text-blue-400 font-bold">R</span>
+                        <span className="text-[10px] text-green-400 font-bold">A</span>
+                      </div>
                     </div>
                   </div>
                 </div>

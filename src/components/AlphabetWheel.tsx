@@ -12,58 +12,109 @@ export function AlphabetWheel({ shift, highlightedInput, highlightedOutput }: Al
   const shiftedAlphabet = [...ALPHABET.slice(shift), ...ALPHABET.slice(0, shift)];
   
   return (
-    <div className="glass-card p-6 overflow-x-auto">
-      <div className="flex flex-col gap-2 min-w-max">
-        {/* Original alphabet */}
-        <div className="flex gap-1">
-          <span className="w-16 text-xs text-muted-foreground font-mono flex items-center">Plain:</span>
-          {ALPHABET.map((letter, i) => (
-            <div
-              key={`orig-${i}`}
-              className={cn(
-                "w-8 h-8 flex items-center justify-center font-mono text-sm rounded border",
-                highlightedInput === letter
-                  ? "bg-primary/20 border-primary text-primary"
-                  : "bg-muted/50 border-border text-foreground"
-              )}
-            >
-              {letter}
-            </div>
-          ))}
+    <div className="overflow-x-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/20">
+      <div className="min-w-max p-3 rounded-xl bg-gradient-to-br from-muted/20 to-muted/5 border border-border/30">
+        {/* Original alphabet - Input Row */}
+        <div className="flex gap-0.5">
+          <div className="w-16 h-9 flex items-center justify-end pr-2">
+            <span className={cn(
+              "text-xs font-semibold uppercase tracking-wide transition-colors",
+              highlightedInput ? "text-blue-400" : "text-muted-foreground/60"
+            )}>Plain</span>
+          </div>
+          {ALPHABET.map((letter, i) => {
+            const isHighlighted = highlightedInput === letter;
+            return (
+              <div
+                key={`orig-${i}`}
+                className={cn(
+                  "w-9 h-9 flex flex-col items-center justify-center font-mono text-sm rounded-lg transition-all duration-200",
+                  isHighlighted
+                    ? "bg-blue-500 text-white font-bold shadow-lg shadow-blue-500/30 scale-110 z-10"
+                    : "bg-muted/30 text-foreground/50 hover:bg-muted/50 hover:text-foreground/70"
+                )}
+              >
+                <span className="font-medium">{letter}</span>
+                <span className="text-[8px] opacity-50">{i}</span>
+              </div>
+            );
+          })}
         </div>
         
-        {/* Arrow indicators */}
-        <div className="flex gap-1">
-          <span className="w-16" />
-          {ALPHABET.map((_, i) => (
-            <div key={`arrow-${i}`} className="w-8 flex items-center justify-center text-muted-foreground">
-              ↓
-            </div>
-          ))}
+        {/* Shift indicator row */}
+        <div className="flex gap-0.5 mt-0.5">
+          <div className="w-16 h-6 flex items-center justify-end pr-2">
+            <span className={cn(
+              "text-[10px] font-mono transition-colors",
+              highlightedInput ? "text-amber-400" : "text-muted-foreground/40"
+            )}>+{shift}</span>
+          </div>
+          {ALPHABET.map((_, i) => {
+            const isHighlighted = highlightedInput === ALPHABET[i];
+            return (
+              <div 
+                key={`arrow-${i}`} 
+                className={cn(
+                  "w-9 h-6 flex items-center justify-center transition-all duration-200",
+                  isHighlighted ? "text-amber-400 scale-125" : "text-muted-foreground/20"
+                )}
+              >
+                ↓
+              </div>
+            );
+          })}
         </div>
         
-        {/* Shifted alphabet */}
-        <div className="flex gap-1">
-          <span className="w-16 text-xs text-muted-foreground font-mono flex items-center">Cipher:</span>
-          {shiftedAlphabet.map((letter, i) => (
-            <div
-              key={`shift-${i}`}
-              className={cn(
-                "w-8 h-8 flex items-center justify-center font-mono text-sm rounded border",
-                highlightedOutput === letter
-                  ? "bg-secondary/20 border-secondary text-secondary"
-                  : "bg-muted/50 border-border text-foreground"
-              )}
-            >
-              {letter}
-            </div>
-          ))}
+        {/* Shifted alphabet - Output Row */}
+        <div className="flex gap-0.5 mt-0.5">
+          <div className="w-16 h-9 flex items-center justify-end pr-2">
+            <span className={cn(
+              "text-xs font-semibold uppercase tracking-wide transition-colors",
+              highlightedOutput ? "text-primary" : "text-muted-foreground/60"
+            )}>Cipher</span>
+          </div>
+          {shiftedAlphabet.map((letter, i) => {
+            const isHighlighted = highlightedOutput === letter && highlightedInput === ALPHABET[i];
+            return (
+              <div
+                key={`shift-${i}`}
+                className={cn(
+                  "w-9 h-9 flex flex-col items-center justify-center font-mono text-sm rounded-lg transition-all duration-200",
+                  isHighlighted
+                    ? "bg-primary text-primary-foreground font-bold ring-2 ring-primary shadow-lg shadow-primary/40 scale-110 z-20"
+                    : "bg-muted/30 text-foreground/50 hover:bg-muted/50 hover:text-foreground/70"
+                )}
+              >
+                <span className="font-medium">{letter}</span>
+                <span className="text-[8px] opacity-50">{ALPHABET.indexOf(letter)}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
       
-      <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-        <span className="font-mono">Shift: {shift}</span>
-        <span className="text-xs">({shift > 0 ? `+${shift}` : shift} positions)</span>
+      <div className="mt-3 flex items-center justify-center gap-4 text-sm">
+        <div className="flex items-center gap-1.5 text-xs">
+          <div className={cn(
+            "w-3 h-3 rounded border transition-colors",
+            highlightedInput ? "bg-blue-500/50 border-blue-500" : "bg-muted/50 border-border"
+          )}></div>
+          <span className="text-muted-foreground">Plaintext</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs">
+          <div className={cn(
+            "w-3 h-3 rounded border transition-colors",
+            highlightedInput ? "bg-amber-500/50 border-amber-500" : "bg-muted/50 border-border"
+          )}></div>
+          <span className="text-muted-foreground">Shift (+{shift})</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs">
+          <div className={cn(
+            "w-3 h-3 rounded border transition-colors",
+            highlightedOutput ? "bg-primary/50 border-primary" : "bg-muted/50 border-border"
+          )}></div>
+          <span className="text-muted-foreground">Ciphertext</span>
+        </div>
       </div>
     </div>
   );

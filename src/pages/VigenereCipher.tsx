@@ -356,10 +356,26 @@ export default function VigenereCipher() {
           </div>
 
           {/* Right - Visualization + Steps */}
-          <div className="glass-card p-5 space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">
-              {mode === "encrypt" ? "Encryption" : "Decryption"} Steps
-            </h3>
+          <div className="glass-card p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-foreground">
+                {mode === "encrypt" ? "Encryption" : "Decryption"} Visualization
+              </h3>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 text-xs">
+                  <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+                  <span className="text-muted-foreground">Input</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                  <span className="text-muted-foreground">Key</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <div className="w-2.5 h-2.5 rounded-full bg-primary"></div>
+                  <span className="text-muted-foreground">Output</span>
+                </div>
+              </div>
+            </div>
 
             {/* Progress bar */}
             {hasAnimated && (
@@ -368,7 +384,7 @@ export default function VigenereCipher() {
                   <span>Progress</span>
                   <span>Letter {Math.min(activeIndex + 1, cleanInput.length)} / {cleanInput.length}</span>
                 </div>
-                <div className="h-1 bg-muted rounded-full overflow-hidden">
+                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-primary transition-all duration-300"
                     style={{ width: `${((Math.min(activeIndex + 1, cleanInput.length)) / cleanInput.length) * 100}%` }}
@@ -376,77 +392,148 @@ export default function VigenereCipher() {
                 </div>
               </div>
             )}
-            
-            {/* Input letters - clickable */}
-            <div>
-              <p className="text-xs text-muted-foreground mb-1.5">
-                {mode === "encrypt" ? "Plaintext" : "Ciphertext"} - Click to navigate
-              </p>
-              <div className="flex flex-wrap gap-1">
-                {cleanInput.split("").map((letter, i) => {
-                  const isActive = i === activeIndex;
-                  const isProcessed = i <= activeIndex && activeIndex >= 0;
-                  
-                  return (
-                    <button 
-                      key={`input-${i}`} 
-                      onClick={() => !isAnimating && goToStep(i)}
-                      disabled={isAnimating}
-                      className={cn(
-                        "flex flex-col items-center cursor-pointer transition-all hover:bg-muted/30 rounded p-0.5",
-                        "disabled:cursor-not-allowed",
-                        isActive && "bg-primary/20 ring-1 ring-primary",
-                        isProcessed && !isActive && "bg-muted/30"
-                      )}
-                    >
-                      <div className={cn(
-                        "w-8 h-8 rounded flex items-center justify-center font-mono text-base border transition-all",
-                        isActive && "bg-blue-500/30 border-blue-500 text-blue-400 scale-105",
-                        isProcessed && !isActive && "bg-muted/50 border-muted-foreground/50 text-muted-foreground",
-                        !isProcessed && "border-border text-foreground"
-                      )}>
-                        {letter}
-                      </div>
-                      <div className="text-[9px] text-secondary">
-                        {getKeyChar(i)}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
 
-            {/* Output letters - clickable */}
-            {hasAnimated && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-1.5">
-                  {mode === "encrypt" ? "Ciphertext" : "Plaintext"}
-                </p>
-                <div className="flex flex-wrap gap-1">
-                  {outputText.split("").map((letter, i) => {
-                    const isCurrentStep = i === activeIndex;
-                    
+            {/* Tape Visualization */}
+            <div className="space-y-2 py-2">
+              {/* Input Tape */}
+              <div className="flex items-center justify-center gap-3">
+                <div className="w-20 text-right text-xs text-blue-400 font-semibold uppercase tracking-wide">
+                  {mode === "encrypt" ? "Plain" : "Cipher"}
+                </div>
+                <div className="flex gap-0.5">
+                  {cleanInput.split("").map((letter, i) => {
+                    const isActive = i === activeIndex;
                     return (
                       <button 
-                        key={`output-${i}`}
-                        onClick={() => goToStep(i)}
+                        key={`input-${i}`} 
+                        onClick={() => !isAnimating && goToStep(i)}
+                        disabled={isAnimating}
                         className={cn(
-                          "w-8 h-8 rounded flex items-center justify-center font-mono text-base border transition-all cursor-pointer",
-                          "hover:bg-muted/30 text-green-400 border-green-500/50",
-                          isCurrentStep && "bg-green-500/20 ring-1 ring-green-500 scale-105"
+                          "w-11 h-14 flex flex-col items-center justify-center rounded-lg transition-all duration-300",
+                          "bg-gradient-to-b from-blue-500/30 to-blue-500/10 border border-blue-500/40",
+                          "hover:from-blue-500/40 hover:to-blue-500/20 cursor-pointer disabled:cursor-default",
+                          isActive && isAnimating && "ring-2 ring-blue-400 scale-105 shadow-lg shadow-blue-500/20"
                         )}
                       >
-                        {letter}
+                        <span className={cn(
+                          "font-mono font-bold text-xl",
+                          isActive && isAnimating ? "text-blue-300" : "text-blue-400"
+                        )}>{letter}</span>
+                        <span className="text-[9px] text-blue-400/60 font-mono">{ALPHABET.indexOf(letter)}</span>
                       </button>
                     );
                   })}
                 </div>
               </div>
-            )}
+
+              {/* Operation Line */}
+              <div className="flex items-center justify-center gap-3">
+                <div className="w-20" />
+                <div className="flex gap-0.5">
+                  {cleanInput.split("").map((_, i) => (
+                    <div key={`op-${i}`} className="w-11 flex items-center justify-center">
+                      <span className={cn(
+                        "text-xl font-bold transition-all duration-300",
+                        i === activeIndex && isAnimating 
+                          ? "text-green-400 scale-150" 
+                          : hasAnimated && i <= activeIndex
+                            ? "text-green-400/50"
+                            : "text-muted-foreground/30"
+                      )}>{mode === "encrypt" ? "+" : "−"}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Key Tape */}
+              <div className="flex items-center justify-center gap-3">
+                <div className="w-20 text-right text-xs text-green-400 font-semibold uppercase tracking-wide">
+                  Key
+                </div>
+                <div className="flex gap-0.5">
+                  {cleanInput.split("").map((_, i) => {
+                    const keyChar = getKeyChar(i);
+                    const isActive = i === activeIndex;
+                    return (
+                      <div 
+                        key={`key-${i}`}
+                        className={cn(
+                          "w-11 h-14 flex flex-col items-center justify-center rounded-lg transition-all duration-300",
+                          "bg-gradient-to-b from-green-500/30 to-green-500/10 border border-green-500/40",
+                          isActive && isAnimating && "ring-2 ring-green-400 scale-105 shadow-lg shadow-green-500/20"
+                        )}
+                      >
+                        <span className={cn(
+                          "font-mono font-bold text-xl",
+                          isActive && isAnimating ? "text-green-300" : "text-green-400"
+                        )}>{keyChar}</span>
+                        <span className="text-[9px] text-green-400/60 font-mono">{ALPHABET.indexOf(keyChar)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Equals Line */}
+              <div className="flex items-center justify-center gap-3">
+                <div className="w-20" />
+                <div className="flex gap-0.5">
+                  {cleanInput.split("").map((_, i) => (
+                    <div key={`eq-${i}`} className="w-11 flex items-center justify-center">
+                      <div className={cn(
+                        "w-6 h-0.5 transition-all duration-300",
+                        hasAnimated 
+                          ? (isAnimating ? (i < activeIndex ? "bg-primary" : "bg-muted-foreground/20") : (i <= activeIndex ? "bg-primary" : "bg-muted-foreground/20"))
+                          : "bg-muted-foreground/20"
+                      )} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Output Tape */}
+              <div className="flex items-center justify-center gap-3">
+                <div className="w-20 text-right text-xs text-primary font-semibold uppercase tracking-wide">
+                  {mode === "encrypt" ? "Cipher" : "Plain"}
+                </div>
+                <div className="flex gap-0.5">
+                  {cleanInput.split("").map((_, i) => {
+                    const fullResult = processText(inputText, key);
+                    const outputLetter = hasAnimated 
+                      ? (isAnimating ? outputText[i] : fullResult[i])
+                      : undefined;
+                    const showOutput = hasAnimated && (isAnimating ? i < activeIndex : i <= activeIndex);
+                    return (
+                      <button 
+                        key={`output-${i}`}
+                        onClick={() => !isAnimating && outputLetter && goToStep(i)}
+                        disabled={isAnimating || !outputLetter}
+                        className={cn(
+                          "w-11 h-14 flex flex-col items-center justify-center rounded-lg transition-all duration-300",
+                          showOutput && outputLetter
+                            ? "bg-gradient-to-b from-primary/30 to-primary/10 border border-primary/40 cursor-pointer hover:from-primary/40 hover:to-primary/20"
+                            : "bg-muted/30 border border-border/50",
+                          i === activeIndex - 1 && isAnimating && "ring-2 ring-primary scale-105 shadow-lg shadow-primary/20"
+                        )}
+                      >
+                        {showOutput && outputLetter ? (
+                          <>
+                            <span className="font-mono font-bold text-xl text-primary">{outputLetter}</span>
+                            <span className="text-[9px] text-primary/60 font-mono">{ALPHABET.indexOf(outputLetter)}</span>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground/40 text-lg">?</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
 
             {/* Step navigation buttons */}
             {hasAnimated && !isAnimating && (
-              <div className="flex items-center justify-center gap-2">
+              <div className="flex items-center justify-center gap-2 pt-2 border-t border-border/50">
                 <Button
                   onClick={goToPrevStep}
                   disabled={activeIndex <= 0}
@@ -458,7 +545,7 @@ export default function VigenereCipher() {
                   Prev
                 </Button>
                 <span className="text-xs text-muted-foreground px-2">
-                  {activeIndex + 1}/{cleanInput.length}
+                  Step {activeIndex + 1} of {cleanInput.length}
                 </span>
                 <Button
                   onClick={goToNextStep}
@@ -473,60 +560,33 @@ export default function VigenereCipher() {
               </div>
             )}
 
-            {/* Current Step Detail - Integrated */}
+            {/* Current Step Equation */}
             {calculation && (
-              <div className="pt-3 border-t border-border space-y-3">
-                <h4 className="text-sm font-semibold text-primary">
-                  Step {activeIndex + 1}: Letter "{cleanInput[activeIndex]}" → "{calculation.result}" (Key: {getKeyChar(activeIndex)})
-                </h4>
-                
-                {/* Compact 4-column grid */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-                  {/* Input Letter */}
-                  <div className="bg-blue-500/10 rounded-lg p-3 text-center border border-blue-500/30">
-                    <div className="text-xs text-muted-foreground mb-1">
-                      {mode === "encrypt" ? "Plain" : "Cipher"}
-                    </div>
-                    <div className="w-12 h-12 mx-auto rounded-lg bg-blue-500/20 border-2 border-blue-500 flex items-center justify-center text-2xl font-bold text-blue-400">
-                      {cleanInput[activeIndex]}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      idx: <span className="text-blue-400 font-mono">{ALPHABET.indexOf(cleanInput[activeIndex])}</span>
-                    </div>
-                  </div>
-
-                  {/* Key Letter */}
-                  <div className="bg-secondary/10 rounded-lg p-3 text-center border border-secondary/30">
-                    <div className="text-xs text-muted-foreground mb-1">Key</div>
-                    <div className="w-12 h-12 mx-auto rounded-lg bg-secondary/20 border-2 border-secondary flex items-center justify-center text-2xl font-bold text-secondary">
-                      {getKeyChar(activeIndex)}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      idx: <span className="text-secondary font-mono">{ALPHABET.indexOf(getKeyChar(activeIndex))}</span>
-                    </div>
-                  </div>
-
-                  {/* Operation */}
-                  <div className="bg-muted/20 rounded-lg p-3 text-center flex flex-col justify-center">
-                    <div className="font-mono text-xs text-foreground">
-                      ({ALPHABET.indexOf(cleanInput[activeIndex])} {calculation.operation} {ALPHABET.indexOf(getKeyChar(activeIndex))})
-                    </div>
-                    <div className="text-xl text-primary my-1">=</div>
-                    <div className="font-mono text-xl text-primary">
-                      {ALPHABET.indexOf(calculation.result)}
-                    </div>
-                  </div>
-
-                  {/* Result Letter */}
-                  <div className="bg-green-500/10 rounded-lg p-3 text-center border border-green-500/30">
-                    <div className="text-xs text-muted-foreground mb-1">
-                      {mode === "encrypt" ? "Cipher" : "Plain"}
-                    </div>
-                    <div className="w-12 h-12 mx-auto rounded-lg bg-green-500/20 border-2 border-green-500 flex items-center justify-center text-2xl font-bold text-green-400">
-                      {calculation.result}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      idx: <span className="text-green-400 font-mono">{ALPHABET.indexOf(calculation.result)}</span>
+              <div className="pt-3 border-t border-border/50">
+                <div className="flex items-center justify-center">
+                  <div className="inline-flex items-center gap-3 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-500/10 via-green-500/10 to-primary/10 border border-border/50">
+                    <span className="text-xs text-muted-foreground">Step {activeIndex + 1}:</span>
+                    <div className="flex items-center gap-2 font-mono">
+                      <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 font-bold">
+                        {cleanInput[activeIndex]}
+                      </span>
+                      <span className="text-muted-foreground text-xs">
+                        ({ALPHABET.indexOf(cleanInput[activeIndex])})
+                      </span>
+                      <span className="text-green-400 font-bold">{calculation.operation}</span>
+                      <span className="px-2 py-0.5 rounded bg-green-500/20 text-green-400 font-bold">
+                        {getKeyChar(activeIndex)}
+                      </span>
+                      <span className="text-muted-foreground text-xs">
+                        ({ALPHABET.indexOf(getKeyChar(activeIndex))})
+                      </span>
+                      <span className="text-primary">=</span>
+                      <span className="px-2 py-0.5 rounded bg-primary/20 text-primary font-bold">
+                        {calculation.result}
+                      </span>
+                      <span className="text-muted-foreground text-xs">
+                        ({ALPHABET.indexOf(calculation.result)})
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -535,47 +595,108 @@ export default function VigenereCipher() {
           </div>
         </div>
 
-        {/* Bottom Row - Full Width Tabula Recta hint */}
+        {/* Bottom Row - Full Vigenère Table (Tabula Recta) */}
         <div className="glass-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-3">Vigenère Table (Tabula Recta)</h3>
-          <div className="overflow-x-auto">
-            <div className="flex gap-1 text-xs font-mono">
-              <div className="w-6 h-6 flex items-center justify-center text-muted-foreground">+</div>
-              {ALPHABET.split("").map((letter) => (
-                <div 
-                  key={letter} 
-                  className={`w-6 h-6 flex items-center justify-center ${
-                    letter === cleanInput[activeIndex] ? "bg-primary/30 text-primary rounded" : "text-muted-foreground"
-                  }`}
-                >
-                  {letter}
-                </div>
-              ))}
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Vigenère Table (Tabula Recta)</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Find intersection of {mode === "encrypt" ? "plaintext column" : "ciphertext"} and key row
+              </p>
             </div>
-            {ALPHABET.split("").slice(0, 5).map((rowLetter, rowIndex) => (
-              <div key={rowLetter} className="flex gap-1 text-xs font-mono">
-                <div className={`w-6 h-6 flex items-center justify-center ${
-                  rowLetter === getKeyChar(activeIndex) ? "bg-secondary/30 text-secondary rounded" : "text-muted-foreground"
-                }`}>
-                  {rowLetter}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 text-xs">
+                <div className="w-3 h-3 rounded bg-blue-500/50 border border-blue-500"></div>
+                <span className="text-muted-foreground">{mode === "encrypt" ? "Plain" : "Cipher"}</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs">
+                <div className="w-3 h-3 rounded bg-green-500/50 border border-green-500"></div>
+                <span className="text-muted-foreground">Key</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs">
+                <div className="w-3 h-3 rounded bg-primary border border-primary"></div>
+                <span className="text-muted-foreground">Result</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="overflow-x-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/20">
+            <div className="min-w-max p-3 rounded-xl bg-gradient-to-br from-muted/30 to-muted/10 border border-border/50">
+              {/* Header Row - Plaintext letters */}
+              <div className="flex gap-0.5">
+                <div className="w-8 h-8 flex items-center justify-center text-xs text-muted-foreground font-semibold">
+                  +
                 </div>
-                {ALPHABET.split("").map((_, colIndex) => {
-                  const shifted = ALPHABET[(colIndex + rowIndex) % 26];
-                  const isHighlighted = rowLetter === getKeyChar(activeIndex) && ALPHABET[colIndex] === cleanInput[activeIndex];
+                {ALPHABET.split("").map((letter, i) => {
+                  const isActive = hasAnimated && letter === cleanInput[activeIndex];
                   return (
                     <div 
-                      key={colIndex} 
-                      className={`w-6 h-6 flex items-center justify-center ${
-                        isHighlighted ? "bg-primary text-primary-foreground rounded font-bold" : "text-foreground/50"
-                      }`}
+                      key={`header-${letter}`} 
+                      className={cn(
+                        "w-8 h-8 flex items-center justify-center font-mono text-xs rounded transition-all duration-200",
+                        isActive 
+                          ? "bg-blue-500 text-white font-bold shadow-lg shadow-blue-500/30 scale-110 z-10" 
+                          : "text-blue-400 bg-blue-500/10"
+                      )}
                     >
-                      {shifted}
+                      {letter}
                     </div>
                   );
                 })}
               </div>
-            ))}
-            <div className="text-xs text-muted-foreground mt-2">... (showing first 5 rows)</div>
+
+              {/* Table Body - Each row is a key letter shift */}
+              {ALPHABET.split("").map((rowLetter, rowIndex) => {
+                const isKeyRow = hasAnimated && rowLetter === getKeyChar(activeIndex);
+                return (
+                  <div key={`row-${rowLetter}`} className="flex gap-0.5 mt-0.5">
+                    {/* Row Header - Key letter */}
+                    <div 
+                      className={cn(
+                        "w-8 h-8 flex items-center justify-center font-mono text-xs rounded transition-all duration-200",
+                        isKeyRow 
+                          ? "bg-green-500 text-white font-bold shadow-lg shadow-green-500/30 scale-110 z-10" 
+                          : "text-green-400 bg-green-500/10"
+                      )}
+                    >
+                      {rowLetter}
+                    </div>
+                    
+                    {/* Row Cells */}
+                    {ALPHABET.split("").map((_, colIndex) => {
+                      const shifted = ALPHABET[(colIndex + rowIndex) % 26];
+                      const plainChar = hasAnimated ? cleanInput[activeIndex] : null;
+                      const keyChar = hasAnimated ? getKeyChar(activeIndex) : null;
+                      
+                      const isIntersection = plainChar && keyChar && 
+                        rowLetter === keyChar && ALPHABET[colIndex] === plainChar;
+                      const isInActiveRow = isKeyRow;
+                      const isInActiveCol = hasAnimated && ALPHABET[colIndex] === plainChar;
+                      
+                      return (
+                        <div 
+                          key={`cell-${rowIndex}-${colIndex}`} 
+                          className={cn(
+                            "w-8 h-8 flex items-center justify-center font-mono text-xs rounded transition-all duration-200",
+                            isIntersection 
+                              ? "bg-primary text-primary-foreground font-bold ring-2 ring-primary shadow-lg shadow-primary/40 scale-110 z-20" 
+                              : isInActiveRow && isInActiveCol
+                                ? "bg-primary/30 text-primary"
+                                : isInActiveRow
+                                  ? "bg-green-500/20 text-green-300"
+                                  : isInActiveCol
+                                    ? "bg-blue-500/20 text-blue-300"
+                                    : "text-foreground/40 hover:bg-muted/50 hover:text-foreground/70"
+                          )}
+                        >
+                          {shifted}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>

@@ -10,9 +10,17 @@ interface CipherLayoutProps {
 
 export function CipherLayout({ title, description, children }: CipherLayoutProps) {
   return (
-    <div className="min-h-screen bg-background grid-bg">
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Enhanced Background Effects */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(120,119,198,0.1),transparent_50%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:20px_20px]" />
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+      </div>
+
       {/* Header */}
-      <header className="border-b border-border/50 bg-background/80 backdrop-blur-xl sticky top-0 z-50">
+      <header className="border-b border-border/50 bg-background/80 backdrop-blur-xl sticky top-0 z-50 relative">
         <div className="px-4 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link to="/">
@@ -35,7 +43,7 @@ export function CipherLayout({ title, description, children }: CipherLayoutProps
       </header>
 
       {/* Main content */}
-      <main className="px-4 lg:px-8 py-6">
+      <main className="px-4 lg:px-8 py-6 relative z-10">
         {children}
       </main>
     </div>

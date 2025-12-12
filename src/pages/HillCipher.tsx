@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { CipherLayout } from "@/components/CipherLayout";
-import { LetterBox } from "@/components/LetterBox";
 import { ModeToggle } from "@/components/ModeToggle";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -9,10 +8,11 @@ import { cn } from "@/lib/utils";
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-// Matrix operations
-function matrixMultiply(matrix: number[][], vector: number[]): number[] {
+// Matrix operations 
+function matrixMultiply(matrix: number[][], vector: number[]): number[] {   
   return matrix.map(row => 
     row.reduce((sum, val, i) => sum + val * vector[i], 0)
+    // sum=(a×x)+(b×y)
   );
 }
 
@@ -20,16 +20,17 @@ function mod(n: number, m: number): number {
   return ((n % m) + m) % m;
 }
 
-// Calculate modular inverse using extended Euclidean algorithm
+// Calculate modular inverse using 
 function modInverse(a: number, m: number): number {
   a = mod(a, m);
   for (let x = 1; x < m; x++) {
     if (mod(a * x, m) === 1) return x;
   }
+  // (a × x) mod 26 = 1
   return -1; // No inverse exists
 }
 
-// Calculate determinant for 2x2 matrix
+// (a*d - b*c)
 function determinant2x2(matrix: number[][]): number {
   return matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0];
 }
@@ -45,12 +46,15 @@ function inverseMatrix2x2(matrix: number[][]): number[][] | null {
     [mod(matrix[1][1] * detInv, 26), mod(-matrix[0][1] * detInv, 26)],
     [mod(-matrix[1][0] * detInv, 26), mod(matrix[0][0] * detInv, 26)]
   ];
+  // [d, -b]
+  // [-c, a]
 }
 
 function hillEncrypt(text: string, keyMatrix: number[][]): string {
   const cleanText = text.toUpperCase().replace(/[^A-Z]/g, "");
   // Pad with X if needed
   const paddedText = cleanText.length % 2 === 0 ? cleanText : cleanText + "X";
+
   
   let result = "";
   for (let i = 0; i < paddedText.length; i += 2) {
@@ -66,6 +70,7 @@ function hillEncrypt(text: string, keyMatrix: number[][]): string {
 
 function hillDecrypt(text: string, keyMatrix: number[][]): string {
   const inverseKey = inverseMatrix2x2(keyMatrix);
+  console.log("Inverse Key Matrix:", inverseKey);
   if (!inverseKey) return "INVALID KEY";
   
   const cleanText = text.toUpperCase().replace(/[^A-Z]/g, "");
@@ -139,7 +144,7 @@ export default function HillCipher() {
     setOutputText("");
   };
 
-  // Navigate to a specific step
+// build steps to  the current step
   const goToStep = (step: number) => {
     if (step < 0 || step >= totalSteps) return;
     setIsAnimating(false);
@@ -219,11 +224,30 @@ export default function HillCipher() {
       rawResults
     };
 
+    // Set calculation immediately so it shows during animation
     setCurrentCalculation(stepData);
+    // Also update output text immediately for this step
+    setCompletedSteps((prev) => {
+      // Only add if not already completed
+      if (prev.length === activeStep) {
+        return [...prev, stepData];
+      }
+      return prev;
+    });
+    
+    // Build output text from all steps up to and including current
+    const newOutput = Array.from({ length: activeStep + 1 }).map((_, i) => {
+      const stepIdx = i * 2;
+      const c1 = paddedInput[stepIdx];
+      const c2 = paddedInput[stepIdx + 1] || "X";
+      const iv = [ALPHABET.indexOf(c1), ALPHABET.indexOf(c2)];
+      const raw = matrixMultiply(matrixUsed, iv);
+      const rv = raw.map(v => mod(v, 26));
+      return ALPHABET[rv[0]] + ALPHABET[rv[1]];
+    }).join("");
+    setOutputText(newOutput);
 
     const timer = setTimeout(() => {
-      setOutputText((prev) => prev + outputPair);
-      setCompletedSteps((prev) => [...prev, stepData]);
       setActiveStep((prev) => prev + 1);
     }, 1500);
 
@@ -370,31 +394,34 @@ export default function HillCipher() {
               )}
             </div>
             
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
-                Key Matrix (2×2)
+            <div className="bg-green-500/5 rounded-lg p-4 border border-green-500/20">
+              <label className="block text-sm font-medium text-green-400 mb-3">
+                Key Matrix 
               </label>
-              <div className="flex items-center gap-2">
-                <div className="text-3xl text-muted-foreground">[</div>
-                <div className="grid grid-cols-2 gap-2">
-                  {keyMatrix.map((row, i) => 
-                    row.map((val, j) => (
-                      <input
-                        key={`${i}-${j}`}
-                        type="number"
-                        value={val}
-                        onChange={(e) => handleMatrixChange(i, j, e.target.value)}
-                        className="w-12 h-12 bg-secondary/10 border border-secondary/50 rounded-lg text-center font-mono text-lg text-secondary focus:outline-none focus:ring-2 focus:ring-secondary"
-                        min={0}
-                        max={25}
-                      />
-                    ))
-                  )}
-                </div>
-                <div className="text-3xl text-muted-foreground">]</div>
+              <div className="flex items-center gap-1">
+                <div className="text-2xl text-amber-500/60"></div>
+                <div className="grid grid-cols-2 gap-px">
+                      {keyMatrix.map((row, i) => 
+                        row.map((val, j) => (
+                          <div 
+                            key={`enc-${i}-${j}`} 
+                            className={cn(
+                              "w-8 h-8 bg-gradient-to-b from-green-500/25 to-green-500/10 border border-green-500/40 flex items-center justify-center text-sm font-bold text-green-400",
+                              i === 0 && j === 0 && "rounded-tl",
+                              i === 0 && j === 1 && "rounded-tr border-l-0",
+                              i === 1 && j === 0 && "rounded-bl border-t-0",
+                              i === 1 && j === 1 && "rounded-br border-l-0 border-t-0"
+                            )}
+                          >
+                            {val}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                <div className="text-2xl text-green-500/60"></div>
               </div>
               {!isValidKey && (
-                <p className="text-xs text-red-500 mt-1">Invalid: no modular inverse</p>
+                <p className="text-xs text-red-500 mt-2">Invalid: no modular inverse exists</p>
               )}
             </div>
 
@@ -492,44 +519,62 @@ export default function HillCipher() {
             <div className="pt-4 border-t border-border">
               <h4 className="text-xs font-semibold text-foreground mb-3">Key Matrix Information</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-secondary/5 rounded-lg p-3">
-                  <h5 className="text-xs font-medium text-secondary mb-2">Encryption Matrix</h5>
-                  <div className="flex items-center gap-2 font-mono">
-                    <div className="text-lg text-muted-foreground">[</div>
-                    <div className="grid grid-cols-2 gap-1">
+                <div className="bg-green-500/5 rounded-lg p-3 border border-green-500/20">
+                  <h5 className="text-xs font-medium text-green-400 mb-2">Encryption Matrix</h5>
+                  <div className="flex items-center justify-center gap-1 font-mono">
+                    <div className="text-lg text-green-500/50">[</div>
+                    <div className="grid grid-cols-2 gap-px">
                       {keyMatrix.map((row, i) => 
                         row.map((val, j) => (
-                          <div key={`enc-${i}-${j}`} className="w-7 h-7 bg-secondary/10 rounded flex items-center justify-center text-sm text-secondary">
+                          <div 
+                            key={`enc-${i}-${j}`} 
+                            className={cn(
+                              "w-8 h-8 bg-gradient-to-b from-green-500/25 to-green-500/10 border border-green-500/40 flex items-center justify-center text-sm font-bold text-green-400",
+                              i === 0 && j === 0 && "rounded-tl",
+                              i === 0 && j === 1 && "rounded-tr border-l-0",
+                              i === 1 && j === 0 && "rounded-bl border-t-0",
+                              i === 1 && j === 1 && "rounded-br border-l-0 border-t-0"
+                            )}
+                          >
                             {val}
                           </div>
                         ))
                       )}
                     </div>
-                    <div className="text-lg text-muted-foreground">]</div>
+                    <div className="text-lg text-green-500/50">]</div>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-2">
+                  <p className="text-xs text-muted-foreground mt-2 text-center">
                     det = {mod(determinant2x2(keyMatrix), 26)} (mod 26)
                   </p>
                 </div>
                 
-                <div className="bg-primary/5 rounded-lg p-3">
+                <div className="bg-primary/5 rounded-lg p-3 border border-primary/20">
                   <h5 className="text-xs font-medium text-primary mb-2">Decryption Matrix</h5>
                   {inverseKey ? (
                     <>
-                      <div className="flex items-center gap-2 font-mono">
-                        <div className="text-lg text-muted-foreground">[</div>
-                        <div className="grid grid-cols-2 gap-1">
+                      <div className="flex items-center justify-center gap-1 font-mono">
+                        <div className="text-lg text-primary/50">[</div>
+                        <div className="grid grid-cols-2 gap-px">
                           {inverseKey.map((row, i) => 
                             row.map((val, j) => (
-                              <div key={`dec-${i}-${j}`} className="w-7 h-7 bg-primary/10 rounded flex items-center justify-center text-sm text-primary">
+                              <div 
+                                key={`dec-${i}-${j}`} 
+                                className={cn(
+                                  "w-8 h-8 bg-gradient-to-b from-primary/25 to-primary/10 border border-primary/40 flex items-center justify-center text-sm font-bold text-primary",
+                                  i === 0 && j === 0 && "rounded-tl",
+                                  i === 0 && j === 1 && "rounded-tr border-l-0",
+                                  i === 1 && j === 0 && "rounded-bl border-t-0",
+                                  i === 1 && j === 1 && "rounded-br border-l-0 border-t-0"
+                                )}
+                              >
                                 {Math.round(val)}
                               </div>
                             ))
                           )}
                         </div>
-                        <div className="text-lg text-muted-foreground">]</div>
+                        <div className="text-lg text-primary/50">]</div>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-2">
+                      <p className="text-xs text-muted-foreground mt-2 text-center">
                         K × K⁻¹ ≡ I (mod 26)
                       </p>
                     </>
@@ -565,10 +610,10 @@ export default function HillCipher() {
               </div>
             )}
             
-            {/* Input pairs */}
-            <div className="mb-3">
+            {/* Input pairs - Enhanced */}
+            <div className="mb-4">
               <p className="text-xs text-muted-foreground mb-2">Input Pairs</p>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-3">
                 {Array.from({ length: totalSteps }).map((_, stepIdx) => {
                   const idx = stepIdx * 2;
                   const char1 = paddedInput[idx];
@@ -582,70 +627,138 @@ export default function HillCipher() {
                       onClick={() => !isAnimating && goToStep(stepIdx)}
                       disabled={isAnimating}
                       className={cn(
-                        "flex items-center gap-1 px-2 py-1 rounded transition-all cursor-pointer hover:bg-muted/30",
-                        isActive && "bg-primary/20 ring-1 ring-primary",
-                        isProcessed && !isActive && "bg-muted/50",
-                        !isProcessed && "bg-muted/20"
+                        "flex items-center gap-0.5 px-1 py-1 rounded-lg transition-all cursor-pointer",
+                        isActive && "bg-blue-500/20 ring-2 ring-blue-500 scale-105",
+                        isProcessed && !isActive && "bg-muted/40",
+                        !isProcessed && "bg-muted/20 hover:bg-muted/30"
                       )}
                     >
-                      <LetterBox letter={char1} variant="input" isActive={isActive} />
-                      <LetterBox letter={char2} variant="input" isActive={isActive} />
+                      <div className={cn(
+                        "w-10 h-12 rounded-l-lg border-2 flex flex-col items-center justify-center transition-all",
+                        isActive 
+                          ? "bg-gradient-to-b from-blue-500/40 to-blue-500/20 border-blue-400" 
+                          : isProcessed
+                            ? "bg-gradient-to-b from-blue-500/25 to-blue-500/10 border-blue-500/50"
+                            : "bg-gradient-to-b from-blue-500/15 to-blue-500/5 border-blue-500/30"
+                      )}>
+                        <span className={cn(
+                          "text-base font-bold",
+                          isActive ? "text-blue-300" : "text-blue-400"
+                        )}>{char1}</span>
+                        <span className="text-[8px] text-blue-400/50">{ALPHABET.indexOf(char1)}</span>
+                      </div>
+                      <div className={cn(
+                        "w-10 h-12 rounded-r-lg border-2 border-l-0 flex flex-col items-center justify-center transition-all",
+                        isActive 
+                          ? "bg-gradient-to-b from-blue-500/40 to-blue-500/20 border-blue-400" 
+                          : isProcessed
+                            ? "bg-gradient-to-b from-blue-500/25 to-blue-500/10 border-blue-500/50"
+                            : "bg-gradient-to-b from-blue-500/15 to-blue-500/5 border-blue-500/30"
+                      )}>
+                        <span className={cn(
+                          "text-base font-bold",
+                          isActive ? "text-blue-300" : "text-blue-400"
+                        )}>{char2}</span>
+                        <span className="text-[8px] text-blue-400/50">{ALPHABET.indexOf(char2)}</span>
+                      </div>
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Matrix operation indicator */}
-            <div className="flex items-center justify-center py-2">
-              <div className="flex items-center gap-2 text-xs bg-muted/20 px-3 py-1.5 rounded">
-                <div className="flex items-center">
-                  <span className="text-muted-foreground mr-0.5">[</span>
-                  <div className="grid grid-cols-2 gap-0.5">
+            {/* Matrix operation - Compact Horizontal Flow */}
+            <div className="flex items-center justify-center py-3">
+              <div className="flex items-center gap-2">
+                {/* Input Vector */}
+                <div className="flex flex-col items-center">
+                  <span className="text-[9px] text-blue-400/70 mb-0.5">Input Vector</span>
+                  <div className="flex items-center gap-px">
+                    <div className={cn(
+                      "w-9 h-9 rounded-l border flex items-center justify-center transition-all",
+                      hasAnimated && currentCalculation 
+                        ? "bg-blue-500/20 border-blue-500/60 text-blue-400" 
+                        : "bg-blue-500/10 border-blue-500/30 text-muted-foreground"
+                    )}>
+                      <span className="text-sm font-mono font-bold">
+                        {hasAnimated && currentCalculation ? currentCalculation.inputVector[0] : "?"}
+                      </span>
+                    </div>
+                    <div className={cn(
+                      "w-9 h-9 rounded-r border border-l-0 flex items-center justify-center transition-all",
+                      hasAnimated && currentCalculation 
+                        ? "bg-blue-500/20 border-blue-500/60 text-blue-400" 
+                        : "bg-blue-500/10 border-blue-500/30 text-muted-foreground"
+                    )}>
+                      <span className="text-sm font-mono font-bold">
+                        {hasAnimated && currentCalculation ? currentCalculation.inputVector[1] : "?"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60" />
+
+                {/* Key Matrix - Compact 2x2 */}
+                <div className="flex flex-col items-center">
+                  <span className="text-[9px] text-green-400/70 mb-0.5">Key Matrix</span>
+                  <div className="grid grid-cols-2 gap-px">
                     {(mode === "encrypt" ? keyMatrix : inverseKey || keyMatrix).map((row, i) => 
                       row.map((val, j) => (
-                        <span 
+                        <div 
                           key={`${i}-${j}`} 
                           className={cn(
-                            "w-5 h-5 flex items-center justify-center text-[10px] font-mono",
-                            mode === "encrypt" ? "text-secondary" : "text-primary"
+                            "w-8 h-8 flex items-center justify-center text-xs font-mono font-bold border",
+                            "bg-green-500/20 border-green-500/50 text-green-400",
+                            i === 0 && j === 0 && "rounded-tl",
+                            i === 0 && j === 1 && "rounded-tr border-l-0",
+                            i === 1 && j === 0 && "rounded-bl border-t-0",
+                            i === 1 && j === 1 && "rounded-br border-l-0 border-t-0"
                           )}
                         >
                           {Math.round(val)}
-                        </span>
+                        </div>
                       ))
                     )}
                   </div>
-                  <span className="text-muted-foreground ml-0.5">]</span>
                 </div>
-                <span className="text-muted-foreground">×</span>
-                <span className={cn(
-                  "font-mono",
-                  hasAnimated && currentCalculation 
-                    ? "text-blue-400" 
-                    : "text-muted-foreground"
-                )}>
-                  {hasAnimated && currentCalculation 
-                    ? `[${currentCalculation.inputVector.join(",")}]` 
-                    : "[v]"}
-                </span>
-                <span className="text-muted-foreground">mod 26</span>
-                {hasAnimated && currentCalculation && (
-                  <>
-                    <span className="text-muted-foreground">=</span>
-                    <span className="text-primary font-mono">
-                      [{currentCalculation.resultVector.join(",")}]
-                    </span>
-                  </>
-                )}
+
+                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60" />
+
+                {/* Result Vector */}
+                <div className="flex flex-col items-center">
+                  <span className="text-[9px] text-primary/70 mb-0.5">Result (mod 26)</span>
+                  <div className="flex items-center gap-px">
+                    <div className={cn(
+                      "w-9 h-9 rounded-l border flex items-center justify-center transition-all",
+                      hasAnimated && currentCalculation 
+                        ? "bg-primary/20 border-primary/60 text-primary" 
+                        : "bg-primary/10 border-primary/30 text-muted-foreground"
+                    )}>
+                      <span className="text-sm font-mono font-bold">
+                        {hasAnimated && currentCalculation ? currentCalculation.resultVector[0] : "?"}
+                      </span>
+                    </div>
+                    <div className={cn(
+                      "w-9 h-9 rounded-r border border-l-0 flex items-center justify-center transition-all",
+                      hasAnimated && currentCalculation 
+                        ? "bg-primary/20 border-primary/60 text-primary" 
+                        : "bg-primary/10 border-primary/30 text-muted-foreground"
+                    )}>
+                      <span className="text-sm font-mono font-bold">
+                        {hasAnimated && currentCalculation ? currentCalculation.resultVector[1] : "?"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Output pairs - Only show when animation has started */}
+            {/* Output pairs - Enhanced */}
             {hasAnimated && (
-              <div>
+              <div className="mb-4">
                 <p className="text-xs text-muted-foreground mb-2">Output Pairs</p>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-3">
                   {outputText.length > 0 ? (
                     Array.from({ length: Math.ceil(outputText.length / 2) }).map((_, stepIdx) => {
                       const idx = stepIdx * 2;
@@ -660,12 +773,37 @@ export default function HillCipher() {
                           key={stepIdx}
                           onClick={() => goToStep(stepIdx)}
                           className={cn(
-                            "flex items-center gap-1 px-2 py-1 rounded transition-all cursor-pointer hover:bg-muted/30",
-                            isCurrentStep && "bg-primary/20 ring-1 ring-primary"
+                            "flex items-center gap-0.5 px-1 py-1 rounded-lg transition-all cursor-pointer",
+                            isCurrentStep && "bg-primary/20 ring-2 ring-primary scale-105",
+                            !isCurrentStep && "bg-muted/20 hover:bg-muted/30"
                           )}
                         >
-                          <LetterBox letter={char1} variant="output" />
-                          {char2 && <LetterBox letter={char2} variant="output" />}
+                          <div className={cn(
+                            "w-10 h-12 rounded-l-lg border-2 flex flex-col items-center justify-center transition-all",
+                            isCurrentStep 
+                              ? "bg-gradient-to-b from-primary/40 to-primary/20 border-primary" 
+                              : "bg-gradient-to-b from-primary/25 to-primary/10 border-primary/50"
+                          )}>
+                            <span className={cn(
+                              "text-base font-bold",
+                              isCurrentStep ? "text-primary" : "text-primary/80"
+                            )}>{char1}</span>
+                            <span className="text-[8px] text-primary/50">{ALPHABET.indexOf(char1)}</span>
+                          </div>
+                          {char2 && (
+                            <div className={cn(
+                              "w-10 h-12 rounded-r-lg border-2 border-l-0 flex flex-col items-center justify-center transition-all",
+                              isCurrentStep 
+                                ? "bg-gradient-to-b from-primary/40 to-primary/20 border-primary" 
+                                : "bg-gradient-to-b from-primary/25 to-primary/10 border-primary/50"
+                            )}>
+                              <span className={cn(
+                                "text-base font-bold",
+                                isCurrentStep ? "text-primary" : "text-primary/80"
+                              )}>{char2}</span>
+                              <span className="text-[8px] text-primary/50">{ALPHABET.indexOf(char2)}</span>
+                            </div>
+                          )}
                         </button>
                       );
                     })
@@ -676,29 +814,29 @@ export default function HillCipher() {
               </div>
             )}
 
-            {/* Current calculation detail - Integrated */}
+            {/* Current calculation detail - Enhanced & Scaled Up */}
             {currentCalculation && (
-              <div className="mt-4 pt-4 border-t border-border">
-                <h4 className="text-sm font-semibold text-primary mb-3">
+              <div className="mt-5 pt-5 border-t border-border">
+                <h4 className="text-base font-semibold text-primary mb-4 text-center">
                   Step {activeStep + 1}: "{currentCalculation.inputPair}" → "{currentCalculation.outputPair}"
                 </h4>
                 
-                {/* Compact 4-step horizontal layout */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {/* 4-step horizontal layout - Scaled Up */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Step 1: Letter to Number */}
-                  <div className="bg-muted/30 rounded-lg p-3">
-                    <div className="text-xs font-medium text-blue-400 mb-2 flex items-center gap-1.5">
-                      <span className="w-4 h-4 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px]">1</span>
+                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+                    <div className="text-sm font-medium text-blue-400 mb-3 flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[10px] font-bold">1</span>
                       Letters → Numbers
                     </div>
-                    <div className="flex items-center justify-center gap-3">
+                    <div className="flex items-center justify-center gap-4">
                       {[0, 1].map((i) => (
                         <div key={i} className="text-center">
-                          <div className="w-9 h-9 rounded-lg bg-blue-500/20 border-2 border-blue-500 flex items-center justify-center text-base font-bold text-blue-400">
+                          <div className="w-11 h-11 rounded-lg bg-gradient-to-b from-blue-500/35 to-blue-500/15 border-2 border-blue-500 flex items-center justify-center text-lg font-bold text-blue-400 shadow-sm shadow-blue-500/20">
                             {currentCalculation.inputPair[i]}
                           </div>
-                          <div className="text-xs text-muted-foreground my-0.5">↓</div>
-                          <div className="w-7 h-7 rounded bg-blue-500/30 flex items-center justify-center text-xs font-mono text-blue-300">
+                          <div className="text-sm text-blue-400/60 my-1">↓</div>
+                          <div className="w-9 h-9 rounded-lg bg-blue-500/30 border border-blue-500/50 flex items-center justify-center text-sm font-mono font-bold text-blue-300">
                             {currentCalculation.inputVector[i]}
                           </div>
                         </div>
@@ -706,45 +844,58 @@ export default function HillCipher() {
                     </div>
                   </div>
 
-                  {/* Step 2: Matrix × Vector */}
-                  <div className="bg-muted/30 rounded-lg p-3">
-                    <div className="text-xs font-medium text-purple-400 mb-2 flex items-center gap-1.5">
-                      <span className="w-4 h-4 rounded-full bg-purple-500 text-white flex items-center justify-center text-[9px]">2</span>
+                  {/* Step 2: Matrix × Vector - Enhanced Alignment */}
+                  <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+                    <div className="text-sm font-medium text-green-400 mb-3 flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-green-500 text-white flex items-center justify-center text-[10px] font-bold">2</span>
                       Matrix × Vector
                     </div>
-                    <div className="flex items-center justify-center gap-1.5 text-xs">
-                      <div className="grid grid-cols-2 gap-0.5">
+                    <div className="flex items-center justify-center gap-1.5">
+                      {/* Matrix */}
+                      <div className="grid grid-cols-2 gap-px p-0.5 bg-green-500/10 rounded border border-green-500/30">
                         {currentCalculation.matrixUsed.flat().map((val, i) => (
-                          <div key={i} className="w-5 h-5 flex items-center justify-center rounded bg-purple-500/20 text-purple-400 text-[10px]">
+                          <div key={i} className="w-6 h-6 flex items-center justify-center rounded-sm bg-green-500/20 text-green-400 text-[10px] font-mono font-bold">
                             {Math.round(val)}
                           </div>
                         ))}
                       </div>
-                      <span className="text-purple-400 text-sm">×</span>
-                      <div className="flex flex-col gap-0.5">
+                      
+                      <span className="text-green-400 text-xs">×</span>
+                      
+                      {/* Vector */}
+                      <div className="flex flex-col gap-px p-0.5 bg-blue-500/10 rounded border border-blue-500/30">
                         {currentCalculation.inputVector.map((v, i) => (
-                          <div key={i} className="w-5 h-5 flex items-center justify-center rounded bg-blue-500/20 text-blue-400 text-[10px]">
+                          <div key={i} className="w-6 h-6 flex items-center justify-center rounded-sm bg-blue-500/20 text-blue-400 text-[10px] font-mono font-bold">
                             {v}
                           </div>
                         ))}
                       </div>
-                      <span className="text-muted-foreground">=</span>
-                      <span className="text-orange-400 font-mono text-sm">[{currentCalculation.rawResults.join(",")}]</span>
+                      
+                      <span className="text-muted-foreground text-xs">=</span>
+                      
+                      {/* Result */}
+                      <div className="flex flex-col gap-px p-0.5 bg-orange-500/10 rounded border border-orange-500/30">
+                        {currentCalculation.rawResults.map((v, i) => (
+                          <div key={i} className="w-6 h-6 flex items-center justify-center rounded-sm bg-orange-500/20 text-orange-400 text-[10px] font-mono font-bold">
+                            {v}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
                   {/* Step 3: Mod 26 */}
-                  <div className="bg-muted/30 rounded-lg p-3">
-                    <div className="text-xs font-medium text-green-400 mb-2 flex items-center gap-1.5">
-                      <span className="w-4 h-4 rounded-full bg-green-500 text-white flex items-center justify-center text-[9px]">3</span>
+                  <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4">
+                    <div className="text-sm font-medium text-orange-400 mb-3 flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-orange-500 text-white flex items-center justify-center text-[10px] font-bold">3</span>
                       Mod 26
                     </div>
-                    <div className="flex items-center justify-center gap-3">
+                    <div className="flex items-center justify-center gap-4">
                       {[0, 1].map((i) => (
                         <div key={i} className="text-center">
-                          <div className="text-xs font-mono text-orange-400">{currentCalculation.rawResults[i]}</div>
-                          <div className="text-[10px] text-green-400">mod 26</div>
-                          <div className="w-7 h-7 rounded bg-green-500/20 border border-green-500 flex items-center justify-center text-xs font-mono text-green-400 mt-0.5">
+                          <div className="text-sm font-mono text-orange-400 px-2 py-0.5 bg-orange-500/25 rounded-lg border border-orange-500/40">{currentCalculation.rawResults[i]}</div>
+                          <div className="text-xs text-orange-400/60 my-1">mod 26</div>
+                          <div className="w-9 h-9 rounded-lg bg-gradient-to-b from-orange-500/35 to-orange-500/15 border-2 border-orange-500 flex items-center justify-center text-sm font-mono font-bold text-orange-400 shadow-sm shadow-orange-500/20">
                             {currentCalculation.resultVector[i]}
                           </div>
                         </div>
@@ -753,19 +904,19 @@ export default function HillCipher() {
                   </div>
 
                   {/* Step 4: Numbers → Letters */}
-                  <div className="bg-muted/30 rounded-lg p-3">
-                    <div className="text-xs font-medium text-primary mb-2 flex items-center gap-1.5">
-                      <span className="w-4 h-4 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[9px]">4</span>
+                  <div className="bg-primary/10 border border-primary/30 rounded-xl p-4">
+                    <div className="text-sm font-medium text-primary mb-3 flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold">4</span>
                       Numbers → Letters
                     </div>
-                    <div className="flex items-center justify-center gap-3">
+                    <div className="flex items-center justify-center gap-4">
                       {[0, 1].map((i) => (
                         <div key={i} className="text-center">
-                          <div className="w-7 h-7 rounded bg-green-500/20 flex items-center justify-center text-xs font-mono text-green-400">
+                          <div className="w-9 h-9 rounded-lg bg-orange-500/25 border border-orange-500/50 flex items-center justify-center text-sm font-mono font-bold text-orange-400">
                             {currentCalculation.resultVector[i]}
                           </div>
-                          <div className="text-xs text-muted-foreground my-0.5">↓</div>
-                          <div className="w-9 h-9 rounded-lg bg-primary/20 border-2 border-primary flex items-center justify-center text-base font-bold text-primary">
+                          <div className="text-sm text-primary/60 my-1">↓</div>
+                          <div className="w-11 h-11 rounded-lg bg-gradient-to-b from-primary/35 to-primary/15 border-2 border-primary flex items-center justify-center text-lg font-bold text-primary shadow-sm shadow-primary/20">
                             {currentCalculation.outputPair[i]}
                           </div>
                         </div>
@@ -774,40 +925,43 @@ export default function HillCipher() {
                   </div>
                 </div>
 
-                {/* Row calculation breakdown */}
-                <div className="mt-3 text-xs space-y-1.5">
-                  {[0, 1].map((row) => (
-                    <div key={row} className="flex items-center gap-1 justify-center flex-wrap">
-                      <span className="text-muted-foreground w-12">Row {row + 1}:</span>
-                      <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">
-                        {Math.round(currentCalculation.matrixUsed[row][0])}
-                      </span>
-                      <span className="text-muted-foreground">×</span>
-                      <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
-                        {currentCalculation.inputVector[0]}
-                      </span>
-                      <span className="text-muted-foreground">+</span>
-                      <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">
-                        {Math.round(currentCalculation.matrixUsed[row][1])}
-                      </span>
-                      <span className="text-muted-foreground">×</span>
-                      <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">
-                        {currentCalculation.inputVector[1]}
-                      </span>
-                      <span className="text-muted-foreground">=</span>
-                      <span className="px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400">
-                        {currentCalculation.rawResults[row]}
-                      </span>
-                      <span className="text-muted-foreground">→</span>
-                      <span className="px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-bold">
-                        {currentCalculation.resultVector[row]}
-                      </span>
-                      <span className="text-muted-foreground">→</span>
-                      <span className="px-1.5 py-0.5 rounded bg-primary/20 text-primary font-bold">
-                        {currentCalculation.outputPair[row]}
-                      </span>
-                    </div>
-                  ))}
+                {/* Row calculation breakdown - Enhanced */}
+                <div className="mt-4 p-4 bg-muted/20 rounded-xl border border-border/50">
+                  <p className="text-sm text-muted-foreground mb-3 text-center font-medium">Calculation Details</p>
+                  <div className="space-y-2">
+                    {[0, 1].map((row) => (
+                      <div key={row} className="flex items-center gap-2 justify-center flex-wrap text-sm">
+                        <span className="text-muted-foreground font-medium w-14">Row {row + 1}:</span>
+                        <span className="px-2 py-1 rounded-lg bg-green-500/20 text-green-400 font-mono border border-green-500/30">
+                          {Math.round(currentCalculation.matrixUsed[row][0])}
+                        </span>
+                        <span className="text-muted-foreground">×</span>
+                        <span className="px-2 py-1 rounded-lg bg-blue-500/20 text-blue-400 font-mono border border-blue-500/30">
+                          {currentCalculation.inputVector[0]}
+                        </span>
+                        <span className="text-muted-foreground">+</span>
+                        <span className="px-2 py-1 rounded-lg bg-green-500/20 text-green-400 font-mono border border-green-500/30">
+                          {Math.round(currentCalculation.matrixUsed[row][1])}
+                        </span>
+                        <span className="text-muted-foreground">×</span>
+                        <span className="px-2 py-1 rounded-lg bg-blue-500/20 text-blue-400 font-mono border border-blue-500/30">
+                          {currentCalculation.inputVector[1]}
+                        </span>
+                        <span className="text-muted-foreground">=</span>
+                        <span className="px-2 py-1 rounded-lg bg-orange-500/20 text-orange-400 font-mono border border-orange-500/30">
+                          {currentCalculation.rawResults[row]}
+                        </span>
+                        <span className="text-muted-foreground">→</span>
+                        <span className="px-2 py-1 rounded-lg bg-orange-500/30 text-orange-400 font-mono font-bold border border-orange-500/40">
+                          {currentCalculation.resultVector[row]}
+                        </span>
+                        <span className="text-muted-foreground">→</span>
+                        <span className="px-2 py-1 rounded-lg bg-primary/20 text-primary font-bold border border-primary/30">
+                          {currentCalculation.outputPair[row]}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}

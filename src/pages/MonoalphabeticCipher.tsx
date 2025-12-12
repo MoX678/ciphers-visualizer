@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { CipherLayout } from "@/components/CipherLayout";
-import { LetterBox } from "@/components/LetterBox";
 import { ModeToggle } from "@/components/ModeToggle";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -113,34 +112,6 @@ export default function MonoalphabeticCipher() {
     setActiveIndex(-1);
     setOutputText("");
   }, [inputText, key, mode]);
-
-  const getCurrentMapping = () => {
-    if (activeIndex < 0 || activeIndex >= cleanInput.length) return null;
-    // Show mapping during animation or after animation completes (for persistence)
-    if (!isAnimating && !hasAnimated) return null;
-    
-    const inputChar = cleanInput[activeIndex];
-    
-    if (mode === "encrypt") {
-      const plainIndex = ALPHABET.indexOf(inputChar);
-      return {
-        from: inputChar,
-        fromIndex: plainIndex,
-        to: key[plainIndex],
-        toIndex: key.indexOf(key[plainIndex])
-      };
-    } else {
-      const cipherIndex = key.indexOf(inputChar);
-      return {
-        from: inputChar,
-        fromIndex: key.indexOf(inputChar),
-        to: ALPHABET[cipherIndex],
-        toIndex: cipherIndex
-      };
-    }
-  };
-
-  const currentMapping = getCurrentMapping();
 
   return (
     <CipherLayout
@@ -291,156 +262,273 @@ export default function MonoalphabeticCipher() {
                 </div>
               </div>
             )}
+          </div>
 
-            {/* Current mapping indicator */}
-            {currentMapping && isAnimating && (
-              <div className="pt-4 border-t border-border">
-                <div className="flex items-center justify-center gap-4 font-mono text-lg">
-                  <div className="flex flex-col items-center">
-                    <span className="text-[10px] text-muted-foreground">
-                      {mode === "encrypt" ? "Plain" : "Cipher"}
-                    </span>
-                    <span className="text-foreground bg-muted px-3 py-1.5 rounded">
-                      {currentMapping.from}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      idx: {currentMapping.fromIndex}
-                    </span>
-                  </div>
-                  <span className="text-primary text-2xl">→</span>
-                  <div className="flex flex-col items-center">
-                    <span className="text-[10px] text-muted-foreground">
-                      {mode === "encrypt" ? "Cipher" : "Plain"}
-                    </span>
-                    <span className="text-primary bg-primary/20 px-3 py-1.5 rounded">
-                      {currentMapping.to}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      idx: {currentMapping.toIndex}
-                    </span>
+          {/* Right - Combined Visualization with Substitution Table */}
+          <div className="glass-card p-5 space-y-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-foreground">
+                {mode === "encrypt" ? "Encryption" : "Decryption"} Visualization
+              </h3>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 text-xs">
+                  <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+                  <span className="text-muted-foreground">Input</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                  <span className="text-muted-foreground">Key</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <div className="w-2.5 h-2.5 rounded-full bg-primary"></div>
+                  <span className="text-muted-foreground">Output</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Input → Output Transformation - Tape Style */}
+            <div className="space-y-2 py-2">
+              {/* Input Tape */}
+              <div className="flex items-center justify-center gap-3">
+                <div className="w-20 text-right text-xs text-blue-400 font-semibold uppercase tracking-wide">
+                  {mode === "encrypt" ? "Plain" : "Cipher"}
+                </div>
+                <div className="flex gap-0.5">
+                  {cleanInput.split("").map((letter, i) => {
+                    const idx = mode === "encrypt" ? ALPHABET.indexOf(letter) : key.indexOf(letter);
+                    return (
+                      <div
+                        key={`input-${i}`}
+                        className={cn(
+                          "w-11 h-14 flex flex-col items-center justify-center rounded-lg transition-all duration-300",
+                          "bg-gradient-to-b from-blue-500/30 to-blue-500/10 border border-blue-500/40",
+                          i === activeIndex && isAnimating && "ring-2 ring-blue-400 scale-105 shadow-lg shadow-blue-500/20"
+                        )}
+                      >
+                        <span className={cn(
+                          "font-mono font-bold text-xl",
+                          i === activeIndex && isAnimating ? "text-blue-300" : "text-blue-400"
+                        )}>{letter}</span>
+                        <span className="text-[9px] text-blue-400/60 font-mono">{idx}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Substitution Line */}
+              <div className="flex items-center justify-center gap-3">
+                <div className="w-20" />
+                <div className="flex gap-0.5">
+                  {cleanInput.split("").map((_, i) => (
+                    <div key={`sub-${i}`} className="w-11 flex items-center justify-center">
+                      <div className={cn(
+                        "flex flex-col items-center transition-all duration-300",
+                        i === activeIndex && isAnimating 
+                          ? "text-primary scale-110" 
+                          : hasAnimated && i < activeIndex
+                            ? "text-primary/50"
+                            : "text-muted-foreground/20"
+                      )}>
+                        <div className={cn(
+                          "w-0.5 h-2 rounded-full",
+                          i === activeIndex && isAnimating 
+                            ? "bg-primary" 
+                            : hasAnimated && i < activeIndex
+                              ? "bg-primary/50"
+                              : "bg-muted-foreground/20"
+                        )}></div>
+                        <ChevronRight className={cn(
+                          "w-4 h-4 rotate-90 -mt-0.5",
+                          i === activeIndex && isAnimating && "animate-bounce"
+                        )} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Output Tape */}
+              <div className="flex items-center justify-center gap-3">
+                <div className="w-20 text-right text-xs text-primary font-semibold uppercase tracking-wide">
+                  {mode === "encrypt" ? "Cipher" : "Plain"}
+                </div>
+                <div className="flex gap-0.5">
+                  {cleanInput.split("").map((inputLetter, i) => {
+                    const fullResult = isValidKey ? processText(inputText, key) : "";
+                    const outputLetter = hasAnimated 
+                      ? (isAnimating ? outputText[i] : fullResult[i])
+                      : undefined;
+                    const showOutput = hasAnimated && (isAnimating ? i < activeIndex : true);
+                    const idx = outputLetter ? (mode === "encrypt" ? key.indexOf(outputLetter) : ALPHABET.indexOf(outputLetter)) : null;
+                    return (
+                      <div
+                        key={`output-${i}`}
+                        className={cn(
+                          "w-11 h-14 flex flex-col items-center justify-center rounded-lg transition-all duration-300",
+                          showOutput && outputLetter
+                            ? "bg-gradient-to-b from-primary/30 to-primary/10 border border-primary/40"
+                            : "bg-muted/30 border border-border/50",
+                          i === activeIndex - 1 && isAnimating && "ring-2 ring-primary scale-105 shadow-lg shadow-primary/20"
+                        )}
+                      >
+                        {showOutput && outputLetter ? (
+                          <>
+                            <span className="font-mono font-bold text-xl text-primary">{outputLetter}</span>
+                            <span className="text-[9px] text-primary/60 font-mono">{idx}</span>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground/40 text-lg">?</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Current Step Equation */}
+            {isAnimating && activeIndex >= 0 && activeIndex < cleanInput.length && (
+              <div className="pt-3 border-t border-border/50">
+                <div className="flex items-center justify-center">
+                  <div className="inline-flex items-center gap-3 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-500/10 via-green-500/10 to-primary/10 border border-border/50">
+                    <span className="text-xs text-muted-foreground">Step {activeIndex + 1}:</span>
+                    <div className="flex items-center gap-2 font-mono">
+                      <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 font-bold">
+                        {cleanInput[activeIndex]}
+                      </span>
+                      <span className="text-muted-foreground text-xs">
+                        (idx {mode === "encrypt" ? ALPHABET.indexOf(cleanInput[activeIndex]) : key.indexOf(cleanInput[activeIndex])})
+                      </span>
+                      <span className="text-primary">→</span>
+                      <span className="px-2 py-0.5 rounded bg-green-500/20 text-green-400 font-bold">
+                        {mode === "encrypt" 
+                          ? key[ALPHABET.indexOf(cleanInput[activeIndex])]
+                          : ALPHABET[key.indexOf(cleanInput[activeIndex])]
+                        }
+                      </span>
+                      <span className="text-muted-foreground text-xs">
+                        (idx {mode === "encrypt" 
+                          ? key.indexOf(key[ALPHABET.indexOf(cleanInput[activeIndex])])
+                          : key.indexOf(cleanInput[activeIndex])
+                        })
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
             )}
           </div>
+        </div>
 
-          {/* Right - Step-by-Step Visualization */}
-          <div className="glass-card p-5 space-y-4">
-            <h3 className="text-sm font-semibold text-foreground">
-              {mode === "encrypt" ? "Encryption" : "Decryption"} Steps
-            </h3>
-            
-            {/* Input letters */}
-            <div>
-              <p className="text-xs text-muted-foreground mb-2">
-                {mode === "encrypt" ? "Plaintext" : "Ciphertext"}
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {cleanInput.split("").map((letter, i) => (
-                  <LetterBox
-                    key={`input-${i}`}
-                    letter={letter}
-                    variant="input"
-                    isActive={i === activeIndex}
-                    isHighlighted={i < activeIndex}
-                    showIndex
-                    index={mode === "encrypt" ? ALPHABET.indexOf(letter) : key.indexOf(letter)}
-                  />
-                ))}
+        {/* Substitution Table - Full Width Section */}
+        <div className="glass-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-foreground">Substitution Table</h3>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 text-xs">
+                <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+                <span className="text-muted-foreground">Plain</span>
               </div>
-            </div>
-
-            {/* Transformation indicator */}
-            <div className="flex items-center justify-center py-1">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="text-primary">↓</span>
-                <span>Substitution Table</span>
-                <span className="text-primary">↓</span>
-              </div>
-            </div>
-
-            {/* Output letters */}
-            <div>
-              <p className="text-xs text-muted-foreground mb-2">
-                {mode === "encrypt" ? "Ciphertext" : "Plaintext"}
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {hasAnimated ? (
-                  (isAnimating ? outputText : (isValidKey ? processText(inputText, key) : "")).split("").map((letter, i) => (
-                    <LetterBox
-                      key={`output-${i}`}
-                      letter={letter}
-                      variant="output"
-                      isHighlighted={i === activeIndex - 1}
-                      showIndex
-                      index={mode === "encrypt" ? key.indexOf(letter) : ALPHABET.indexOf(letter)}
-                    />
-                  ))
-                ) : (
-                  <span className="text-muted-foreground text-sm italic">Click Animate to see result</span>
-                )}
+              <div className="flex items-center gap-1.5 text-xs">
+                <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                <span className="text-muted-foreground">Cipher</span>
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Substitution Table - Full Width */}
-        <div className="glass-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-3">Substitution Table</h3>
-          
-          <div className="overflow-x-auto">
-            <div className="min-w-max">
-              {/* Plain alphabet */}
-              <div className="flex gap-0.5 mb-0.5">
-                <div className="w-12 text-xs text-muted-foreground flex items-center">Plain:</div>
+          <div className="overflow-x-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/20">
+            <div className="min-w-max space-y-1 p-3 rounded-xl bg-gradient-to-br from-muted/30 to-muted/10 border border-border/50">
+              {/* Plain alphabet row */}
+              <div className="flex items-center gap-1">
+                <div className="w-14 text-[10px] text-blue-400 font-semibold uppercase tracking-wide text-right pr-2">
+                  Plain
+                </div>
                 {ALPHABET.split("").map((letter, i) => {
-                  const isActive = currentMapping && 
-                    ((mode === "encrypt" && letter === currentMapping.from) ||
-                     (mode === "decrypt" && letter === currentMapping.to));
+                  const isInputLetter = cleanInput.includes(letter);
+                  const isCurrentInput = isAnimating && activeIndex >= 0 && 
+                    ((mode === "encrypt" && letter === cleanInput[activeIndex]) ||
+                     (mode === "decrypt" && ALPHABET[key.indexOf(cleanInput[activeIndex])] === letter));
+                  const wasProcessed = hasAnimated && !isAnimating && cleanInput.includes(letter);
                   return (
                     <div
                       key={`plain-${i}`}
                       className={cn(
-                        "w-7 h-7 flex items-center justify-center font-mono text-xs rounded transition-all",
-                        isActive 
-                          ? "bg-primary text-primary-foreground ring-2 ring-primary" 
-                          : "bg-muted text-foreground"
+                        "w-8 h-9 flex flex-col items-center justify-center font-mono rounded-lg transition-all duration-300 relative",
+                        isCurrentInput 
+                          ? "bg-gradient-to-b from-blue-500 to-blue-600 text-white ring-2 ring-blue-400 scale-110 shadow-lg shadow-blue-500/30 z-10" 
+                          : isInputLetter
+                            ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                            : "bg-muted/40 text-muted-foreground border border-border/30",
+                        wasProcessed && "ring-1 ring-blue-500/50"
                       )}
                     >
-                      {letter}
+                      <span className="text-sm font-bold">{letter}</span>
+                      <span className="text-[8px] opacity-60">{i}</span>
                     </div>
                   );
                 })}
               </div>
               
-              {/* Arrow indicators */}
-              <div className="flex gap-0.5 mb-0.5">
-                <div className="w-12"></div>
-                {ALPHABET.split("").map((_, i) => (
-                  <div key={`arrow-${i}`} className="w-7 h-3 flex items-center justify-center text-muted-foreground text-[10px]">
-                    ↓
-                  </div>
-                ))}
+              {/* Connection lines / arrows */}
+              <div className="flex items-center gap-1">
+                <div className="w-14"></div>
+                {ALPHABET.split("").map((_, i) => {
+                  const plainLetter = ALPHABET[i];
+                  const isCurrentMapping = isAnimating && activeIndex >= 0 && 
+                    ((mode === "encrypt" && plainLetter === cleanInput[activeIndex]) ||
+                     (mode === "decrypt" && key[i] === cleanInput[activeIndex]));
+                  return (
+                    <div key={`conn-${i}`} className="w-8 h-5 flex items-center justify-center">
+                      <div className={cn(
+                        "flex flex-col items-center transition-all duration-300",
+                        isCurrentMapping ? "text-primary scale-110" : "text-muted-foreground/30"
+                      )}>
+                        <div className={cn(
+                          "w-0.5 h-2 rounded-full transition-colors",
+                          isCurrentMapping ? "bg-primary" : "bg-muted-foreground/20"
+                        )}></div>
+                        <ChevronRight className={cn(
+                          "w-3 h-3 rotate-90 -mt-0.5 transition-colors",
+                          isCurrentMapping ? "text-primary" : "text-muted-foreground/30"
+                        )} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
               
-              {/* Cipher alphabet */}
-              <div className="flex gap-0.5">
-                <div className="w-12 text-xs text-muted-foreground flex items-center">Cipher:</div>
+              {/* Cipher alphabet row */}
+              <div className="flex items-center gap-1">
+                <div className="w-14 text-[10px] text-green-400 font-semibold uppercase tracking-wide text-right pr-2">
+                  Cipher
+                </div>
                 {key.split("").map((letter, i) => {
-                  const isActive = currentMapping && 
-                    ((mode === "encrypt" && letter === currentMapping.to) ||
-                     (mode === "decrypt" && letter === currentMapping.from));
+                  const isOutputLetter = mode === "encrypt" 
+                    ? cleanInput.split("").some(c => key[ALPHABET.indexOf(c)] === letter)
+                    : cleanInput.includes(letter);
+                  const isCurrentOutput = isAnimating && activeIndex >= 0 && 
+                    ((mode === "encrypt" && letter === key[ALPHABET.indexOf(cleanInput[activeIndex])]) ||
+                     (mode === "decrypt" && letter === cleanInput[activeIndex]));
+                  const wasProcessed = hasAnimated && !isAnimating && (
+                    mode === "encrypt" 
+                      ? cleanInput.split("").some(c => key[ALPHABET.indexOf(c)] === letter)
+                      : cleanInput.includes(letter)
+                  );
                   return (
                     <div
                       key={`cipher-${i}`}
                       className={cn(
-                        "w-7 h-7 flex items-center justify-center font-mono text-xs rounded transition-all",
-                        isActive 
-                          ? "bg-secondary text-secondary-foreground ring-2 ring-secondary" 
-                          : "bg-secondary/20 text-secondary"
+                        "w-8 h-9 flex flex-col items-center justify-center font-mono rounded-lg transition-all duration-300 relative",
+                        isCurrentOutput 
+                          ? "bg-gradient-to-b from-green-500 to-green-600 text-white ring-2 ring-green-400 scale-110 shadow-lg shadow-green-500/30 z-10" 
+                          : isOutputLetter
+                            ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                            : "bg-muted/40 text-muted-foreground border border-border/30",
+                        wasProcessed && "ring-1 ring-green-500/50"
                       )}
                     >
-                      {letter || "?"}
+                      <span className="text-sm font-bold">{letter || "?"}</span>
+                      <span className="text-[8px] opacity-60">{i}</span>
                     </div>
                   );
                 })}
