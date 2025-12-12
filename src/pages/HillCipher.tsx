@@ -822,7 +822,7 @@ export default function HillCipher() {
                 </h4>
                 
                 {/* 4-step horizontal layout - Scaled Up */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Step 1: Letter to Number */}
                   <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
                     <div className="text-sm font-medium text-blue-400 mb-3 flex items-center gap-2">
@@ -850,33 +850,33 @@ export default function HillCipher() {
                       <span className="w-5 h-5 rounded-full bg-green-500 text-white flex items-center justify-center text-[10px] font-bold">2</span>
                       Matrix × Vector
                     </div>
-                    <div className="flex items-center justify-center gap-1.5">
+                    <div className="flex items-center justify-center gap-2 sm:gap-1.5">
                       {/* Matrix */}
-                      <div className="grid grid-cols-2 gap-px p-0.5 bg-green-500/10 rounded border border-green-500/30">
+                      <div className="grid grid-cols-2 gap-0.5 p-1 bg-green-500/10 rounded border border-green-500/30">
                         {currentCalculation.matrixUsed.flat().map((val, i) => (
-                          <div key={i} className="w-6 h-6 flex items-center justify-center rounded-sm bg-green-500/20 text-green-400 text-[10px] font-mono font-bold">
+                          <div key={i} className="w-8 h-8 sm:w-6 sm:h-6 flex items-center justify-center rounded-sm bg-green-500/20 text-green-400 text-xs sm:text-[10px] font-mono font-bold">
                             {Math.round(val)}
                           </div>
                         ))}
                       </div>
                       
-                      <span className="text-green-400 text-xs">×</span>
+                      <span className="text-green-400 text-sm sm:text-xs font-bold">×</span>
                       
                       {/* Vector */}
-                      <div className="flex flex-col gap-px p-0.5 bg-blue-500/10 rounded border border-blue-500/30">
+                      <div className="flex flex-col gap-0.5 p-1 bg-blue-500/10 rounded border border-blue-500/30">
                         {currentCalculation.inputVector.map((v, i) => (
-                          <div key={i} className="w-6 h-6 flex items-center justify-center rounded-sm bg-blue-500/20 text-blue-400 text-[10px] font-mono font-bold">
+                          <div key={i} className="w-8 h-8 sm:w-6 sm:h-6 flex items-center justify-center rounded-sm bg-blue-500/20 text-blue-400 text-xs sm:text-[10px] font-mono font-bold">
                             {v}
                           </div>
                         ))}
                       </div>
                       
-                      <span className="text-muted-foreground text-xs">=</span>
+                      <span className="text-muted-foreground text-sm sm:text-xs font-bold">=</span>
                       
                       {/* Result */}
-                      <div className="flex flex-col gap-px p-0.5 bg-orange-500/10 rounded border border-orange-500/30">
+                      <div className="flex flex-col gap-0.5 p-1 bg-orange-500/10 rounded border border-orange-500/30">
                         {currentCalculation.rawResults.map((v, i) => (
-                          <div key={i} className="w-6 h-6 flex items-center justify-center rounded-sm bg-orange-500/20 text-orange-400 text-[10px] font-mono font-bold">
+                          <div key={i} className="w-8 h-8 sm:w-6 sm:h-6 flex items-center justify-center rounded-sm bg-orange-500/20 text-orange-400 text-xs sm:text-[10px] font-mono font-bold">
                             {v}
                           </div>
                         ))}

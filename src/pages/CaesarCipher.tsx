@@ -3,7 +3,6 @@ import { CipherLayout } from "@/components/CipherLayout";
 import { AlphabetWheel } from "@/components/AlphabetWheel";
 import { ModeToggle } from "@/components/ModeToggle";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Play, Pause, RotateCcw, Info, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -189,20 +188,51 @@ export default function CaesarCipher() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-3">
-                Shift: <span className="text-primary font-mono text-lg">{shift}</span>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Shift Value
               </label>
-              <Slider
-                value={[shift]}
-                onValueChange={([value]) => setShift(value)}
-                min={1}
-                max={25}
-                step={1}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-muted-foreground mt-1 font-mono">
-                <span>1</span>
-                <span>25</span>
+              
+              {/* Modern Shift Control - Compact */}
+              <div className="flex items-center gap-2">
+                {/* Decrement Button */}
+                <button
+                  onClick={() => setShift(prev => Math.max(1, prev - 1))}
+                  disabled={shift <= 1}
+                  className={cn(
+                    "w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm transition-all duration-200",
+                    "border hover:scale-105 active:scale-95",
+                    shift <= 1 
+                      ? "border-muted/30 text-muted-foreground/30 cursor-not-allowed"
+                      : "border-amber-500/50 text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 hover:border-amber-400"
+                  )}
+                >
+                  −
+                </button>
+                
+                {/* Shift Value Display */}
+                <div className="flex-1 flex flex-col items-center py-1.5 px-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
+                  <span className="text-xl font-mono font-bold text-amber-400">
+                    {shift}
+                  </span>
+                  <span className="text-[9px] text-muted-foreground">
+                    {mode === "encrypt" ? `A→${ALPHABET[shift]}` : `${ALPHABET[shift]}→A`}
+                  </span>
+                </div>
+                
+                {/* Increment Button */}
+                <button
+                  onClick={() => setShift(prev => Math.min(25, prev + 1))}
+                  disabled={shift >= 25}
+                  className={cn(
+                    "w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm transition-all duration-200",
+                    "border hover:scale-105 active:scale-95",
+                    shift >= 25 
+                      ? "border-muted/30 text-muted-foreground/30 cursor-not-allowed"
+                      : "border-amber-500/50 text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 hover:border-amber-400"
+                  )}
+                >
+                  +
+                </button>
               </div>
             </div>
 

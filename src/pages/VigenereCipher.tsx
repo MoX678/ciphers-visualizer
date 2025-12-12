@@ -396,11 +396,11 @@ export default function VigenereCipher() {
             {/* Tape Visualization */}
             <div className="space-y-2 py-2">
               {/* Input Tape */}
-              <div className="flex items-center justify-center gap-3">
-                <div className="w-20 text-right text-xs text-blue-400 font-semibold uppercase tracking-wide">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3">
+                <div className="w-full sm:w-20 text-center sm:text-right text-xs text-blue-400 font-semibold uppercase tracking-wide">
                   {mode === "encrypt" ? "Plain" : "Cipher"}
                 </div>
-                <div className="flex gap-0.5">
+                <div className="flex flex-wrap gap-0.5 justify-center">
                   {cleanInput.split("").map((letter, i) => {
                     const isActive = i === activeIndex;
                     return (
@@ -409,17 +409,17 @@ export default function VigenereCipher() {
                         onClick={() => !isAnimating && goToStep(i)}
                         disabled={isAnimating}
                         className={cn(
-                          "w-11 h-14 flex flex-col items-center justify-center rounded-lg transition-all duration-300",
+                          "w-8 h-10 sm:w-11 sm:h-14 flex flex-col items-center justify-center rounded-lg transition-all duration-300",
                           "bg-gradient-to-b from-blue-500/30 to-blue-500/10 border border-blue-500/40",
                           "hover:from-blue-500/40 hover:to-blue-500/20 cursor-pointer disabled:cursor-default",
                           isActive && isAnimating && "ring-2 ring-blue-400 scale-105 shadow-lg shadow-blue-500/20"
                         )}
                       >
                         <span className={cn(
-                          "font-mono font-bold text-xl",
+                          "font-mono font-bold text-base sm:text-xl",
                           isActive && isAnimating ? "text-blue-300" : "text-blue-400"
                         )}>{letter}</span>
-                        <span className="text-[9px] text-blue-400/60 font-mono">{ALPHABET.indexOf(letter)}</span>
+                        <span className="text-[7px] sm:text-[9px] text-blue-400/60 font-mono">{ALPHABET.indexOf(letter)}</span>
                       </button>
                     );
                   })}
@@ -427,13 +427,13 @@ export default function VigenereCipher() {
               </div>
 
               {/* Operation Line */}
-              <div className="flex items-center justify-center gap-3">
-                <div className="w-20" />
-                <div className="flex gap-0.5">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3">
+                <div className="hidden sm:block w-20" />
+                <div className="flex flex-wrap gap-0.5 justify-center">
                   {cleanInput.split("").map((_, i) => (
-                    <div key={`op-${i}`} className="w-11 flex items-center justify-center">
+                    <div key={`op-${i}`} className="w-8 sm:w-11 flex items-center justify-center">
                       <span className={cn(
-                        "text-xl font-bold transition-all duration-300",
+                        "text-lg sm:text-xl font-bold transition-all duration-300",
                         i === activeIndex && isAnimating 
                           ? "text-green-400 scale-150" 
                           : hasAnimated && i <= activeIndex
@@ -446,11 +446,11 @@ export default function VigenereCipher() {
               </div>
 
               {/* Key Tape */}
-              <div className="flex items-center justify-center gap-3">
-                <div className="w-20 text-right text-xs text-green-400 font-semibold uppercase tracking-wide">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3">
+                <div className="w-full sm:w-20 text-center sm:text-right text-xs text-green-400 font-semibold uppercase tracking-wide">
                   Key
                 </div>
-                <div className="flex gap-0.5">
+                <div className="flex flex-wrap gap-0.5 justify-center">
                   {cleanInput.split("").map((_, i) => {
                     const keyChar = getKeyChar(i);
                     const isActive = i === activeIndex;
@@ -458,16 +458,16 @@ export default function VigenereCipher() {
                       <div 
                         key={`key-${i}`}
                         className={cn(
-                          "w-11 h-14 flex flex-col items-center justify-center rounded-lg transition-all duration-300",
+                          "w-8 h-10 sm:w-11 sm:h-14 flex flex-col items-center justify-center rounded-lg transition-all duration-300",
                           "bg-gradient-to-b from-green-500/30 to-green-500/10 border border-green-500/40",
                           isActive && isAnimating && "ring-2 ring-green-400 scale-105 shadow-lg shadow-green-500/20"
                         )}
                       >
                         <span className={cn(
-                          "font-mono font-bold text-xl",
+                          "font-mono font-bold text-base sm:text-xl",
                           isActive && isAnimating ? "text-green-300" : "text-green-400"
                         )}>{keyChar}</span>
-                        <span className="text-[9px] text-green-400/60 font-mono">{ALPHABET.indexOf(keyChar)}</span>
+                        <span className="text-[7px] sm:text-[9px] text-green-400/60 font-mono">{ALPHABET.indexOf(keyChar)}</span>
                       </div>
                     );
                   })}
@@ -475,13 +475,13 @@ export default function VigenereCipher() {
               </div>
 
               {/* Equals Line */}
-              <div className="flex items-center justify-center gap-3">
-                <div className="w-20" />
-                <div className="flex gap-0.5">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3">
+                <div className="hidden sm:block w-20" />
+                <div className="flex flex-wrap gap-0.5 justify-center">
                   {cleanInput.split("").map((_, i) => (
-                    <div key={`eq-${i}`} className="w-11 flex items-center justify-center">
+                    <div key={`eq-${i}`} className="w-8 sm:w-11 flex items-center justify-center">
                       <div className={cn(
-                        "w-6 h-0.5 transition-all duration-300",
+                        "w-5 sm:w-6 h-0.5 transition-all duration-300",
                         hasAnimated 
                           ? (isAnimating ? (i < activeIndex ? "bg-primary" : "bg-muted-foreground/20") : (i <= activeIndex ? "bg-primary" : "bg-muted-foreground/20"))
                           : "bg-muted-foreground/20"
@@ -492,11 +492,11 @@ export default function VigenereCipher() {
               </div>
 
               {/* Output Tape */}
-              <div className="flex items-center justify-center gap-3">
-                <div className="w-20 text-right text-xs text-primary font-semibold uppercase tracking-wide">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3">
+                <div className="w-full sm:w-20 text-center sm:text-right text-xs text-primary font-semibold uppercase tracking-wide">
                   {mode === "encrypt" ? "Cipher" : "Plain"}
                 </div>
-                <div className="flex gap-0.5">
+                <div className="flex flex-wrap gap-0.5 justify-center">
                   {cleanInput.split("").map((_, i) => {
                     const fullResult = processText(inputText, key);
                     const outputLetter = hasAnimated 
@@ -509,7 +509,7 @@ export default function VigenereCipher() {
                         onClick={() => !isAnimating && outputLetter && goToStep(i)}
                         disabled={isAnimating || !outputLetter}
                         className={cn(
-                          "w-11 h-14 flex flex-col items-center justify-center rounded-lg transition-all duration-300",
+                          "w-8 h-10 sm:w-11 sm:h-14 flex flex-col items-center justify-center rounded-lg transition-all duration-300",
                           showOutput && outputLetter
                             ? "bg-gradient-to-b from-primary/30 to-primary/10 border border-primary/40 cursor-pointer hover:from-primary/40 hover:to-primary/20"
                             : "bg-muted/30 border border-border/50",
@@ -518,11 +518,11 @@ export default function VigenereCipher() {
                       >
                         {showOutput && outputLetter ? (
                           <>
-                            <span className="font-mono font-bold text-xl text-primary">{outputLetter}</span>
-                            <span className="text-[9px] text-primary/60 font-mono">{ALPHABET.indexOf(outputLetter)}</span>
+                            <span className="font-mono font-bold text-base sm:text-xl text-primary">{outputLetter}</span>
+                            <span className="text-[7px] sm:text-[9px] text-primary/60 font-mono">{ALPHABET.indexOf(outputLetter)}</span>
                           </>
                         ) : (
-                          <span className="text-muted-foreground/40 text-lg">?</span>
+                          <span className="text-muted-foreground/40 text-base sm:text-lg">?</span>
                         )}
                       </button>
                     );
@@ -597,9 +597,12 @@ export default function VigenereCipher() {
 
         {/* Bottom Row - Full Vigenère Table (Tabula Recta) */}
         <div className="glass-card p-5">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
             <div>
-              <h3 className="text-sm font-semibold text-foreground">Vigenère Table (Tabula Recta)</h3>
+              <h3 className="text-sm font-semibold text-foreground">
+                Vigenère Table<br className="sm:hidden" />
+                <span className="sm:ml-1">(Tabula Recta)</span>
+              </h3>
               <p className="text-xs text-muted-foreground mt-1">
                 Find intersection of {mode === "encrypt" ? "plaintext column" : "ciphertext"} and key row
               </p>
