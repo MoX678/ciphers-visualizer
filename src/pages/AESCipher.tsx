@@ -3,7 +3,7 @@ import { CipherLayout } from "@/components/CipherLayout";
 import { ModeToggle } from "@/components/ModeToggle";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Play, Pause, RotateCcw, Eye, EyeOff, ChevronLeft, ChevronRight, Info } from "lucide-react";
+import { Play, Pause, RotateCcw, Eye, EyeOff, ChevronLeft, ChevronRight, Info, FastForward } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // AES S-box
@@ -2028,6 +2028,20 @@ export default function AESCipher() {
                 {isAnimating ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
                 {isAnimating ? "Pause" : "Animate"}
               </Button>
+              <Button
+                onClick={() => {
+                  if (!hasAnimated) {
+                    startAnimation();
+                  }
+                  setActiveStep(steps.length - 1);
+                }}
+                variant="outline"
+                size="icon"
+                disabled={!steps.length}
+                title="Skip to end"
+              >
+                <FastForward className="w-4 h-4" />
+              </Button>
               <Button onClick={resetAnimation} variant="outline" size="icon">
                 <RotateCcw className="w-4 h-4" />
               </Button>
@@ -2103,9 +2117,16 @@ export default function AESCipher() {
                         : "border-primary/50 text-primary hover:bg-primary/10"
                     )}
                     onClick={() => {
-                      if (mode === "encrypt" && steps.length > 0) {
-                        const cipherHex = stateToHex(steps[steps.length - 1].state).flat().join("");
-                        setInputText(cipherHex);
+                      if (steps.length > 0) {
+                        if (mode === "encrypt") {
+                          // Encrypt → Decrypt: Pass ciphertext as hex
+                          const cipherHex = stateToHex(steps[steps.length - 1].state).flat().join("");
+                          setInputText(cipherHex);
+                        } else {
+                          // Decrypt → Encrypt: Pass plaintext
+                          const plaintext = stateToText(steps[steps.length - 1].state) || "";
+                          setInputText(plaintext);
+                        }
                       }
                       setMode(mode === "encrypt" ? "decrypt" : "encrypt");
                       resetAnimation();
@@ -2120,9 +2141,14 @@ export default function AESCipher() {
                     mode === "decrypt" ? "text-green-400" : "text-primary"
                   )}>
                     {mode === "encrypt" 
-                      ? stateToHex(steps[steps.length - 1].state).flat().join("")
+                      ? stateToText(steps[steps.length - 1].state) || stateToHex(steps[steps.length - 1].state).flat().join("")
                       : stateToText(steps[steps.length - 1].state) || stateToHex(steps[steps.length - 1].state).flat().join("")}
                   </div>
+                  {mode === "encrypt" && (
+                    <div className="text-xs text-muted-foreground font-mono">
+                      Hex: {stateToHex(steps[steps.length - 1].state).flat().join("")}
+                    </div>
+                  )}
                   {mode === "decrypt" && (
                     <div className="text-xs text-muted-foreground font-mono">
                       Bytes: {stateToHex(steps[steps.length - 1].state).flat().join(" ")}
@@ -2130,7 +2156,7 @@ export default function AESCipher() {
                   )}
                 </div>
                 <div className="text-xs text-muted-foreground mt-2">
-                  {mode === "encrypt" ? "32 hex characters (128 bits)" : "Decrypted message"}
+                  {mode === "encrypt" ? "Encrypted bytes as text (Hex below)" : "Decrypted message"}
                 </div>
               </div>
             )}

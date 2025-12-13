@@ -6,8 +6,45 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Play, Pause, RotateCcw, Info, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TutorialTooltip, TutorialStep } from "@/components/TutorialTooltip";
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+const cipherTutorialSteps: TutorialStep[] = [
+  {
+    target: "[data-tutorial='mode-toggle']",
+    title: "Encrypt or Decrypt Mode",
+    description: "Switch between encryption and decryption modes. Encryption encodes your message, while decryption reveals the original text.",
+    position: "bottom",
+  },
+  {
+    target: "[data-tutorial='input-area']",
+    title: "Enter Your Message",
+    description: "Type the text you want to encrypt or decrypt. The cipher works with letters only—other characters remain unchanged.",
+    position: "right",
+    offset: { x: 20, y: 0 },
+  },
+  {
+    target: "[data-tutorial='shift-control']",
+    title: "Adjust the Shift Amount",
+    description: "The shift determines how many positions each letter moves in the alphabet. Try different values to see how it affects the result!",
+    position: "right",
+    offset: { x: 20, y: 0 },
+  },
+  {
+    target: "[data-tutorial='animation-controls']",
+    title: "Animation Controls",
+    description: "Play to see the cipher in action step-by-step, pause to examine each letter, or reset to start over. Watch how each letter transforms!",
+    position: "top",
+  },
+  {
+    target: "[data-tutorial='visualization']",
+    title: "Visual Wheel",
+    description: "This interactive wheel shows how letters shift in the alphabet. The outer ring is the original alphabet, and the inner shows the shifted version.",
+    position: "left",
+    offset: { x: -20, y: 0 },
+  },
+];
 
 function caesarEncrypt(text: string, shift: number): string {
   return text
@@ -95,6 +132,13 @@ export default function CaesarCipher() {
       title="Caesar Cipher"
       description="Classic substitution cipher that shifts letters by a fixed amount"
     >
+      {/* Tutorial */}
+      <TutorialTooltip
+        steps={cipherTutorialSteps}
+        storageKey="caesar-cipher"
+        autoStart={true}
+      />
+
       <div className="w-full space-y-4">
         {/* Top Row - 2 columns: Controls + Visualization */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -103,7 +147,9 @@ export default function CaesarCipher() {
           <div className="glass-card p-5 space-y-4">
             {/* Header with Mode Toggle and Info */}
             <div className="flex items-center justify-between">
-              <ModeToggle mode={mode} onChange={setMode} />
+              <div data-tutorial="mode-toggle">
+                <ModeToggle mode={mode} onChange={setMode} />
+              </div>
               <Dialog>
                 <DialogTrigger asChild>
                   <Button variant="ghost" size="sm" className="text-xs">
@@ -174,7 +220,7 @@ export default function CaesarCipher() {
               </Dialog>
             </div>
 
-            <div>
+            <div data-tutorial="input-area">
               <label className="block text-sm font-medium text-foreground mb-2">
                 {mode === "encrypt" ? "Plaintext" : "Ciphertext"}
               </label>
@@ -187,7 +233,7 @@ export default function CaesarCipher() {
               />
             </div>
 
-            <div>
+            <div data-tutorial="shift-control">
               <label className="block text-sm font-medium text-foreground mb-2">
                 Shift Value
               </label>
@@ -236,7 +282,7 @@ export default function CaesarCipher() {
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div data-tutorial="animation-controls" className="flex gap-2">
               <Button
                 onClick={isAnimating ? () => setIsAnimating(false) : startAnimation}
                 variant="neon"
@@ -312,7 +358,7 @@ export default function CaesarCipher() {
           </div>
 
           {/* Right - Visualization */}
-          <div className="glass-card p-5">
+          <div data-tutorial="visualization" className="glass-card p-5">
             <h3 className="text-sm font-semibold text-foreground mb-4">
               {mode === "encrypt" ? "Encryption" : "Decryption"} Process
             </h3>

@@ -2,11 +2,11 @@
 
 An interactive web application for visualizing and learning classical and modern cryptographic ciphers. Built with React, TypeScript, and Tailwind CSS.
 
-![Cipher Canvas](https://img.shields.io/badge/React-18-blue?logo=react) ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript) ![Tailwind CSS](https://img.shields.io/badge/Tailwind-3-blue?logo=tailwindcss)
+![Cipher Visualizer](https://img.shields.io/badge/React-18-blue?logo=react) ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript) ![Tailwind CSS](https://img.shields.io/badge/Tailwind-3-blue?logo=tailwindcss)
 
 ## 🎯 Overview
 
-Cipher Canvas is an educational tool designed to help students, understand how various encryption algorithms work through interactive visualizations. Each cipher includes step-by-step animations, detailed explanations, and hands-on encryption/decryption capabilities.
+Cipher Visualizer is an educational tool designed to help students, understand how various encryption algorithms work through interactive visualizations. Each cipher includes step-by-step animations, detailed explanations, and hands-on encryption/decryption capabilities.
 
 ## ✨ Features
 
@@ -47,8 +47,8 @@ Cipher Canvas is an educational tool designed to help students, understand how v
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/cipher-canvas.git
-cd cipher-canvas
+git clone https://github.com/MoX678/ciphers-visualizer.git  
+cd cipher-visualizer
 
 # Install dependencies
 npm install
@@ -80,7 +80,7 @@ npm run preview
 ## 📁 Project Structure
 
 ```text
-cipher-canvas/
+cipher-visualizer/
 ├── src/
 │   ├── components/       # Reusable UI components
 │   │   ├── ui/          # shadcn/ui components
@@ -100,7 +100,7 @@ cipher-canvas/
 
 ## 🎓 Educational Use
 
-Cipher Canvas is perfect for:
+Cipher Visualizer is perfect for:
 
 - **Cryptography courses** - Demonstrate cipher mechanics visually
 - **Self-learning** - Understand encryption through interaction

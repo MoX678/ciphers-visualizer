@@ -529,7 +529,7 @@ export function ScrollCards() {
         <div className="text-center p-4 max-w-4xl mx-auto">
 
 
-          <h1 className="text-4xl md:text-7xl font-bold tracking-tight text-white mb-6 animate-fade-in [animation-delay:200ms]">
+          <h1 className="hero-title text-4xl md:text-7xl font-bold tracking-tight text-white mb-6 animate-fade-in [animation-delay:200ms]">
                  Ciphers            
           <span className=" neon-text ml-2">
              Visualizer
@@ -542,6 +542,7 @@ export function ScrollCards() {
             <Button
               size="lg"
               onClick={scrollToCiphers}
+              data-tutorial="explore-button"
               className="h-14 px-8 text-lg rounded-full bg-primary hover:bg-primary/90 shadow-[0_0_30px_-5px_hsl(var(--primary)/0.5)] transition-all duration-300 transform hover:scale-105"
             >
               Explore Ciphers
@@ -593,11 +594,12 @@ export function ScrollCards() {
           {/* Responsive Cipher Grid */}
           <div className="flex-1 flex flex-col justify-center max-w-none" ref={cardsRef}>
             <div className="w-full px-2 sm:px-4 lg:px-6">
-              <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6 gap-2 sm:gap-3 md:gap-3 lg:gap-4 mx-auto max-w-[1600px]">
+              <div data-tutorial="cipher-grid" className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6 gap-2 sm:gap-3 md:gap-3 lg:gap-4 mx-auto max-w-[1600px]">
                 {allCiphers.map((cipher, index) => (
                   <div 
                     key={`overview-${cipher.title}`}
                     className="cipher-card group"
+                    data-tutorial={index === 0 ? "cipher-card-0" : undefined}
                     style={{
                       perspective: '1000px',
                       transformStyle: 'preserve-3d'

@@ -3,7 +3,7 @@ import { CipherLayout } from "@/components/CipherLayout";
 import { ModeToggle } from "@/components/ModeToggle";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Play, Pause, RotateCcw, Info, Eye, EyeOff, ChevronLeft, ChevronRight } from "lucide-react";
+import { Play, Pause, RotateCcw, Info, Eye, EyeOff, ChevronLeft, ChevronRight, FastForward } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // DES Tables
@@ -429,8 +429,8 @@ function desEncryptMultiBlock(plaintext: string, key: string): DESStep[] {
     blockSteps.forEach((step, stepIndex) => {
       allSteps.push({
         ...step,
-        name: `Block ${blockIndex + 1}: ${step.name}`,
-        description: `Block ${blockIndex + 1}/${blocks.length}: ${step.description}`,
+        name: step.name,
+        description: blocks.length > 1 ? `Block ${blockIndex + 1}/${blocks.length}: ${step.description}` : step.description,
         blockInfo: { currentBlock: blockIndex, totalBlocks: blocks.length, blocks }
       });
     });
@@ -468,8 +468,8 @@ function desDecryptMultiBlock(ciphertext: string, key: string): DESStep[] {
     blockSteps.forEach((step, stepIndex) => {
       allSteps.push({
         ...step,
-        name: `Block ${blockIndex + 1}: ${step.name}`,
-        description: `Block ${blockIndex + 1}/${blocks.length}: ${step.description}`,
+        name: step.name,
+        description: blocks.length > 1 ? `Block ${blockIndex + 1}/${blocks.length}: ${step.description}` : step.description,
         blockInfo: { currentBlock: blockIndex, totalBlocks: blocks.length, blocks }
       });
     });
@@ -501,12 +501,7 @@ function BitBlock({ bits, label, color = "primary" }: { bits: number[]; label: s
 
 
 export default function DESCipher() {
-  const [inputText, setInputText] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('des-input-text') || "HELLO WORLD DES!";
-    }
-    return "HELLO WORLD DES!";
-  });
+  const [inputText, setInputText] = useState("HELLO WORLD DES!");
   const [key, setKey] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('des-key') || "SECRETKY";
@@ -524,13 +519,7 @@ export default function DESCipher() {
   const [hasAnimated, setHasAnimated] = useState(false);
   const [showKey, setShowKey] = useState(false);
 
-  // Save to localStorage when values change
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('des-input-text', inputText);
-    }
-  }, [inputText]);
-
+  // Save key and mode to localStorage when they change
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('des-key', key);
@@ -835,6 +824,20 @@ export default function DESCipher() {
               >
                 {isAnimating ? <Pause className="w-4 h-4 mr-2" /> : <Play className="w-4 h-4 mr-2" />}
                 {isAnimating ? "Pause" : "Animate"}
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!hasAnimated) {
+                    startAnimation();
+                  }
+                  setActiveStep(steps.length - 1);
+                }}
+                variant="outline"
+                size="icon"
+                disabled={!steps.length}
+                title="Skip to end"
+              >
+                <FastForward className="w-4 h-4" />
               </Button>
               <Button onClick={resetAnimation} variant="outline" size="icon">
                 <RotateCcw className="w-4 h-4" />
@@ -1148,31 +1151,102 @@ export default function DESCipher() {
               </div>
             )}
 
-            {/* Completion State for FP - Show final diagram with completion message */}
+            {/* Completion State for FP - Show final diagram with table design */}
             {currentStep && currentStep.type === "fp" && (
-              <div className="pt-3 border-t border-border">
-                {/* Completion Banner */}
-                <div className="mb-3 flex items-center justify-center gap-2 p-3 bg-green-500/10 border border-green-500/50 rounded-lg">
-                  <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span className="text-base font-semibold text-green-400">Encryption Complete - All 16 Rounds Processed</span>
-                </div>
-
-                {/* Final Output Display */}
-                <div className="bg-muted/10 rounded-lg p-6 border border-border">
-                  <h4 className="text-sm font-medium text-green-400 text-center mb-4">Final Ciphertext Output</h4>
-                  <div className="space-y-4">
-                    <div className="text-center">
-                      <div className="px-6 py-4 bg-green-500/10 border-2 border-green-500/50 rounded">
-                        <div className="font-mono text-xl text-green-300 font-bold break-all">
-                          {bitsToHex([...currentStep.L, ...currentStep.R])}
-                        </div>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-2">
-                        After Final Permutation (FP)
+              <div className="pt-3 border-t border-border animate-in fade-in duration-500">
+                <h4 className="text-sm font-bold text-green-400 text-center mb-3 uppercase tracking-wider">Final Permutation (FP)</h4>
+                <div className="bg-gradient-to-br from-muted/15 to-muted/5 rounded-xl p-6 border-2 border-border shadow-lg">
+                  <div className="space-y-6">
+                    
+                    {/* Permutation Description */}
+                    <div className="text-center animate-in zoom-in duration-300">
+                      <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-500/20 to-green-500/10 border-2 border-green-500/60 rounded-lg shadow-md ring-2 ring-green-500/20">
+                        <svg className="w-5 h-5 text-green-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                        </svg>
+                        <span className="text-sm font-bold text-green-400">
+                          Bits Rearranged According to FP Table
+                        </span>
                       </div>
                     </div>
+
+                    {/* Before Permutation (after swap) */}
+                    <div className="animate-in slide-in-from-top duration-500 delay-100">
+                      <div className="text-xs text-muted-foreground mb-3 text-center font-bold">Before Permutation</div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="text-center">
+                          <div className="text-xs font-semibold text-muted-foreground mb-2">Swapped L (Bits 1-32)</div>
+                          <div className="px-4 py-3 bg-gradient-to-br from-muted/50 to-muted/30 border-2 border-border rounded-lg text-foreground font-mono text-base font-bold shadow-md hover:scale-105 transition-transform">
+                            {(() => {
+                              const swapStep = steps.find(s => s.type === "swap");
+                              return swapStep ? bitsToHex(swapStep.L).slice(0, 8) : "--------";
+                            })()}
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xs font-semibold text-muted-foreground mb-2">Swapped R (Bits 33-64)</div>
+                          <div className="px-4 py-3 bg-gradient-to-br from-muted/50 to-muted/30 border-2 border-border rounded-lg text-foreground font-mono text-base font-bold shadow-md hover:scale-105 transition-transform">
+                            {(() => {
+                              const swapStep = steps.find(s => s.type === "swap");
+                              return swapStep ? bitsToHex(swapStep.R).slice(0, 8) : "--------";
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Permutation Process */}
+                    <div className="relative py-4">
+                      <div className="flex justify-center items-center gap-4">
+                        {/* Left curved lines */}
+                        <svg width="100" height="80" className="text-green-400/40">
+                          <path d="M 10 10 Q 30 40 50 70" stroke="currentColor" strokeWidth="2" fill="none" strokeDasharray="4,4" />
+                          <path d="M 30 10 Q 40 40 50 70" stroke="currentColor" strokeWidth="2" fill="none" strokeDasharray="4,4" />
+                          <path d="M 50 10 Q 50 40 50 70" stroke="currentColor" strokeWidth="2" fill="none" strokeDasharray="4,4" />
+                        </svg>
+
+                        {/* FP Table Icon */}
+                        <div className="px-6 py-4 bg-gradient-to-br from-green-500/25 to-green-500/15 border-2 border-green-500/60 rounded-xl shadow-lg ring-2 ring-green-500/30 animate-pulse">
+                          <div className="text-center">
+                            <div className="text-sm font-bold text-green-300 mb-1">FP TABLE</div>
+                            <div className="text-xs text-muted-foreground font-medium">64-bit permutation</div>
+                          </div>
+                        </div>
+
+                        {/* Right curved lines */}
+                        <svg width="100" height="80" className="text-green-400/40">
+                          <path d="M 50 10 Q 50 40 50 70" stroke="currentColor" strokeWidth="2" fill="none" strokeDasharray="4,4" />
+                          <path d="M 70 10 Q 60 40 50 70" stroke="currentColor" strokeWidth="2" fill="none" strokeDasharray="4,4" />
+                          <path d="M 90 10 Q 70 40 50 70" stroke="currentColor" strokeWidth="2" fill="none" strokeDasharray="4,4" />
+                        </svg>
+                      </div>
+                      
+                      {/* Arrow down */}
+                      <div className="flex justify-center mt-2">
+                        <svg className="w-6 h-6 text-green-400" fill="currentColor">
+                          <polygon points="3,0 3,14 0,14 6,20 12,14 9,14 9,14 9,0" />
+                        </svg>
+                      </div>
+                    </div>
+
+                    {/* After Permutation - Final Output */}
+                    <div className="animate-in slide-in-from-bottom duration-500 delay-200">
+                      <div className="text-xs text-muted-foreground mb-3 text-center font-bold">After Permutation - Final Output</div>
+                      <div className="text-center">
+                        <div className="px-6 py-4 bg-gradient-to-br from-green-500/20 to-green-500/10 border-2 border-green-500/60 rounded-lg inline-block shadow-lg ring-2 ring-green-500/20 hover:scale-105 transition-transform">
+                          <div className="text-xs font-semibold text-green-400 mb-2">Ciphertext (64 bits)</div>
+                          <div className="font-mono text-xl text-green-300 font-bold break-all">
+                            {bitsToHex([...currentStep.L, ...currentStep.R])}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+                  
+                  {/* Explanation */}
+                  <div className="text-center text-xs text-muted-foreground mt-4 pt-3 border-t border-border">
+                    The final permutation is the inverse of the initial permutation
                   </div>
                 </div>
               </div>
@@ -1259,29 +1333,49 @@ export default function DESCipher() {
               </div>
             )}
 
-            {/* Initial Input Visualization */}
+    
+
+            {/* Initial Input Visualization - Block Division */}
             {currentStep && currentStep.type === "initial" && (
               <div className="pt-3 border-t border-border animate-in fade-in duration-500">
                 <h4 className="text-sm font-bold text-purple-400 text-center mb-3 uppercase tracking-wider">Block Division</h4>
-                <div className="bg-gradient-to-br from-muted/15 to-muted/5 rounded-xl p-4 border-2 border-border shadow-lg">
+                <div className="bg-gradient-to-br from-muted/15 to-muted/5 rounded-xl p-4 sm:p-6 border-2 border-border shadow-lg">
+                  
+
                   
                   {/* Block Progress */}
                   {currentStep.blockInfo && (
-                    <div className="mb-4">
-                      <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-500/20 to-yellow-500/10 border-2 border-yellow-500/60 rounded-lg">
-                        <svg className="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="mb-4 sm:mb-5 flex items-center justify-center">
+                      <div className="inline-flex items-center gap-2 sm:gap-3 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-yellow-500/20 to-orange-500/10 border-2 border-yellow-500/60 rounded-lg shadow-md">
+                        <svg className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <span className="text-sm font-semibold text-yellow-400">
-                          Block {currentStep.blockInfo.currentBlock + 1} of {currentStep.blockInfo.totalBlocks}
-                        </span>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                          <span className="text-sm sm:text-base font-bold text-yellow-300">
+                            Processing Block {currentStep.blockInfo.currentBlock + 1} of {currentStep.blockInfo.totalBlocks}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            {Array.from({ length: currentStep.blockInfo.totalBlocks }).map((_, i) => (
+                              <div
+                                key={i}
+                                className={`w-2 h-2 rounded-full transition-all ${
+                                  i === currentStep.blockInfo?.currentBlock
+                                    ? 'bg-yellow-400 animate-pulse w-3 h-3'
+                                    : i < (currentStep.blockInfo?.currentBlock || 0)
+                                    ? 'bg-green-400'
+                                    : 'bg-muted-foreground/30'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
 
-                  {/* Blocks Grid */}
+                  {/* Blocks - Full width cards stacked vertically */}
                   {currentStep.blockInfo && currentStep.blockInfo.blocks && (
-                    <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(currentStep.blockInfo.blocks.length, 4)}, 1fr)` }}>
+                    <div className="w-full space-y-3">
                       {currentStep.blockInfo.blocks.map((block, idx) => {
                         const isActive = idx === currentStep.blockInfo?.currentBlock;
                         const isCompleted = idx < (currentStep.blockInfo?.currentBlock || 0);
@@ -1289,45 +1383,88 @@ export default function DESCipher() {
                         return (
                           <div
                             key={idx}
-                            className={`relative rounded-lg p-3 border-2 transition-all duration-300 ${
+                            className={`relative rounded-lg p-4 border-2 transition-all duration-300 hover:scale-[1.01] ${
                               isActive
-                                ? 'bg-gradient-to-br from-yellow-500/20 to-orange-500/10 border-yellow-500/60 shadow-lg'
+                                ? 'bg-gradient-to-br from-yellow-500/25 to-orange-500/15 border-yellow-500/70 shadow-xl ring-2 ring-yellow-500/30'
                                 : isCompleted
-                                ? 'bg-gradient-to-br from-green-500/10 to-emerald-500/5 border-green-400/40'
-                                : 'bg-muted/20 border-border'
+                                ? 'bg-gradient-to-br from-green-500/15 to-emerald-500/8 border-green-400/50 shadow-md'
+                                : 'bg-muted/20 border-border shadow-sm'
                             }`}
                           >
                             {/* Status badge */}
-                            <div className={`absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                            <div className={`absolute -top-2 -right-2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shadow-lg border-2 ${
                               isActive
-                                ? 'bg-yellow-400 text-black'
+                                ? 'bg-yellow-400 text-black border-yellow-300 animate-pulse'
                                 : isCompleted
-                                ? 'bg-green-400 text-black'
-                                : 'bg-muted border border-border text-muted-foreground'
+                                ? 'bg-green-400 text-black border-green-300'
+                                : 'bg-muted border-border text-muted-foreground'
                             }`}>
                               {isCompleted ? '✓' : idx + 1}
                             </div>
 
-                            {/* Hex display */}
-                            <div className={`font-mono text-xs font-semibold text-center px-2 py-1.5 rounded border ${
-                              isActive
-                                ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-200'
-                                : isCompleted
-                                ? 'bg-green-500/10 border-green-500/30 text-green-300'
-                                : 'bg-muted/30 border-border text-foreground'
-                            }`}>
-                              {block.split('').map((char, i) => 
-                                char.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase()
-                              ).join('')}
-                            </div>
+                            <div className="flex items-center gap-4">
+                              {/* Block label */}
+                              <div className="flex-shrink-0 w-20">
+                                <span className={`text-sm font-black uppercase tracking-wider block ${
+                                  isActive ? 'text-yellow-300' : isCompleted ? 'text-green-400' : 'text-muted-foreground'
+                                }`}>
+                                  Block {idx + 1}
+                                </span>
+                                <div className="text-[10px] text-muted-foreground mt-0.5">64 bits</div>
+                              </div>
 
-                            {/* Size */}
-                            <div className="text-center mt-1.5">
-                              <span className="text-[9px] text-muted-foreground">64 bits</span>
+                              {/* Hex display - takes full remaining width */}
+                              <div className={`flex-1 font-mono text-base font-bold text-center px-4 py-3 rounded-lg border-2 break-all ${
+                                isActive
+                                  ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-100 shadow-inner'
+                                  : isCompleted
+                                  ? 'bg-green-500/15 border-green-500/40 text-green-200 shadow-inner'
+                                  : 'bg-muted/40 border-border text-foreground/80'
+                              }`}>
+                                {block.split('').map((char, i) => 
+                                  char.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase()
+                                ).join(' ')}
+                              </div>
+
+                              {/* Status pill */}
+                              <div className="flex-shrink-0 w-16">
+                                {isActive && (
+                                  <span className="inline-block px-2 py-1 bg-yellow-500/20 border border-yellow-500/40 rounded text-yellow-300 text-[10px] font-bold animate-pulse whitespace-nowrap">
+                                    ACTIVE
+                                  </span>
+                                )}
+                                {isCompleted && (
+                                  <span className="inline-block px-2 py-1 bg-green-500/20 border border-green-500/40 rounded text-green-300 text-[10px] font-bold whitespace-nowrap">
+                                    DONE
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         );
                       })}
+                      
+                      {/* Summary info */}
+                      <div className="mt-4 pt-3 border-t border-border flex flex-wrap items-center justify-center gap-3 text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-2.5 h-2.5 rounded bg-yellow-400 border border-yellow-300 animate-pulse" />
+                          <span className="text-muted-foreground">Processing</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-2.5 h-2.5 rounded bg-green-400 border border-green-300" />
+                          <span className="text-muted-foreground">Completed</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-2.5 h-2.5 rounded bg-muted border border-border" />
+                          <span className="text-muted-foreground">Pending</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 px-2 py-1 bg-muted/30 rounded border border-border">
+                          <svg className="w-3 h-3 text-purple-400" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                          </svg>
+                          <span className="font-semibold text-foreground">{currentStep.blockInfo?.blocks.length} total</span>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

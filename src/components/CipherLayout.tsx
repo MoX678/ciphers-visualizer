@@ -1,6 +1,9 @@
-import { Link } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { ArrowLeft, Home } from "lucide-react";
 import { Button } from "./ui/button";
+import { CipherSidebar } from "./CipherSidebar";
+import gsap from "gsap";
 
 interface CipherLayoutProps {
   title: string;
@@ -9,8 +12,54 @@ interface CipherLayoutProps {
 }
 
 export function CipherLayout({ title, description, children }: CipherLayoutProps) {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const location = useLocation();
+  const mainRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+  const contentRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    // Animate on page load
+    const ctx = gsap.context(() => {
+      const tl = gsap.timeline();
+      
+      // Header animation - slide down and fade in
+      tl.fromTo(
+        headerRef.current,
+        {
+          y: -100,
+          opacity: 0
+        },
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.6,
+          ease: "power3.out"
+        }
+      );
+
+      // Content animation - fade in and slide up
+      tl.fromTo(
+        contentRef.current,
+        {
+          y: 50,
+          opacity: 0
+        },
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.8,
+          ease: "power3.out"
+        },
+        "-=0.3" // Start slightly before header animation ends
+      );
+    }, mainRef);
+
+    return () => ctx.revert();
+  }, [location.pathname]); // Re-run animation on route change
+
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
+    <div ref={mainRef} className="min-h-screen bg-background relative overflow-hidden">
       {/* Enhanced Background Effects */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(120,119,198,0.1),transparent_50%)]" />
@@ -20,7 +69,7 @@ export function CipherLayout({ title, description, children }: CipherLayoutProps
       </div>
 
       {/* Header */}
-      <header className="border-b border-border/50 bg-background/80 backdrop-blur-xl sticky top-0 z-50 relative">
+      <header ref={headerRef} className="border-b border-border/50 bg-background/80 backdrop-blur-xl sticky top-0 z-50 relative">
         <div className="px-4 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link to="/">
@@ -33,17 +82,23 @@ export function CipherLayout({ title, description, children }: CipherLayoutProps
               <p className="text-sm text-muted-foreground">{description}</p>
             </div>
           </div>
-          <Link to="/">
-            <Button variant="outline" size="sm" className="gap-2">
-              <Home className="w-4 h-4" />
-              All Ciphers
-            </Button>
-          </Link>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-2"
+            onClick={() => setIsSidebarOpen(true)}
+          >
+            <Home className="w-4 h-4" />
+            All Ciphers
+          </Button>
         </div>
       </header>
 
+      {/* Sidebar */}
+      <CipherSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+
       {/* Main content */}
-      <main className="px-4 lg:px-8 py-6 relative z-10">
+      <main ref={contentRef} className="px-4 lg:px-8 py-6 relative z-10">
         {children}
       </main>
     </div>
